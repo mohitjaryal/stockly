@@ -1,10 +1,10 @@
-
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
-from app.models import Stock
+from app.models import User, Stock
 from app.schemas.stock import StockCreate, StockResponse
+from app.core.security import require_admin
 
 router = APIRouter(prefix="/stocks", tags=["Stocks"])
 
@@ -18,21 +18,35 @@ def get_db():
 
 
 @router.post("/", response_model=StockResponse, status_code=201)
-def create_stock(stock_data: StockCreate, db: Session = Depends(get_db)):
+def create_stock(
+    stock_data: StockCreate,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+):
     symbol = stock_data.symbol.strip().upper()
 
-    existing_stock = db.query(Stock).filter(Stock.symbol == symbol).first()
+    existing_stock = (
+        db.query(Stock)
+        .filter(Stock.symbol == symbol)
+        .first()
+    )
+
     if existing_stock:
-        raise HTTPException(status_code=409, detail="Stock already exists")
+        raise HTTPException(
+            status_code=409,
+            detail="Stock already exists",
+        )
 
     stock = Stock(
         symbol=symbol,
         company_name=stock_data.company_name,
         exchange=stock_data.exchange,
     )
+
     db.add(stock)
     db.commit()
     db.refresh(stock)
+
     return stock
 
 
@@ -52,7 +66,7 @@ def get_stock(symbol: str, db: Session = Depends(get_db)):
     if not stock:
         raise HTTPException(
             status_code=404,
-            detail="Stock not found"
+            detail="Stock not found",
         )
 
     return stock
