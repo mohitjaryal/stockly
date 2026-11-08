@@ -1,4 +1,6 @@
 
+
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from decimal import Decimal
@@ -6,11 +8,11 @@ from datetime import datetime, timezone
 import httpx
 
 from app.db.session import SessionLocal
-from app.models import User, Stock, StockPrice
+from app.models import User, Stock, StockPrice, HistoricalCandle
 from app.schemas.stock import StockCreate, StockResponse
 from app.schemas.stock_price import StockPriceResponse
 from app.core.security import require_admin
-from app.services.market_data import get_stock_quote
+from app.services.market_data import get_stock_quote, get_stock_candles
 
 
 router = APIRouter(prefix="/stocks", tags=["Stocks"])
@@ -208,14 +210,13 @@ def get_latest_stock_price(
     return price_record
 
 
-# GET - Historical Stock Prices
-@router.get(
-    "/{symbol}/history",
-    response_model=list[StockPriceResponse],
-)
+
+# GET - Historical Stock Candles from Yahoo Finance
+@router.get("/{symbol}/history", response_model=list[dict])
 def get_stock_price_history(
     symbol: str,
-    limit: int = Query(default=100, ge=1, le=1000),
+    resolution: str = Query(default="D"),
+    period: str = Query(default="1mo"),
     db: Session = Depends(get_db),
 ):
     stock = (
@@ -230,12 +231,115 @@ def get_stock_price_history(
             detail="Stock not found",
         )
 
-    price_history = (
-        db.query(StockPrice)
-        .filter(StockPrice.stock_id == stock.id)
-        .order_by(StockPrice.recorded_at.desc())
+    # Fetch historical candles from Yahoo Finance
+    try:
+        candles = get_stock_candles(
+            symbol=stock.symbol,
+            resolution=resolution,
+            period=period,
+        )
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="Historical market data provider request failed",
+        ) from exc
+
+    # Save candles in PostgreSQL
+    try:
+        for candle in candles:
+            recorded_at = datetime.fromtimestamp(
+                candle["time"],
+                tz=timezone.utc,
+            )
+
+            existing_candle = (
+                db.query(HistoricalCandle)
+                .filter(
+                    HistoricalCandle.stock_id == stock.id,
+                    HistoricalCandle.resolution == resolution,
+                    HistoricalCandle.recorded_at == recorded_at,
+                )
+                .first()
+            )
+
+            if existing_candle:
+                existing_candle.open_price = Decimal(str(candle["open"]))
+                existing_candle.high_price = Decimal(str(candle["high"]))
+                existing_candle.low_price = Decimal(str(candle["low"]))
+                existing_candle.close_price = Decimal(str(candle["close"]))
+                existing_candle.volume = candle["volume"]
+
+            else:
+                historical_candle = HistoricalCandle(
+                    stock_id=stock.id,
+                    resolution=resolution,
+                    open_price=Decimal(str(candle["open"])),
+                    high_price=Decimal(str(candle["high"])),
+                    low_price=Decimal(str(candle["low"])),
+                    close_price=Decimal(str(candle["close"])),
+                    volume=candle["volume"],
+                    recorded_at=recorded_at,
+                )
+
+                db.add(historical_candle)
+
+        db.commit()
+
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to save historical candles",
+        ) from exc
+
+    return candles
+
+# GET - Historical Candles from PostgreSQL
+@router.get("/{symbol}/history/db", response_model=list[dict])
+def get_saved_stock_history(
+    symbol: str,
+    resolution: str = Query(default="D"),
+    limit: int = Query(default=500, ge=1, le=5000),
+    db: Session = Depends(get_db),
+):
+    stock = (
+        db.query(Stock)
+        .filter(Stock.symbol == symbol.strip().upper())
+        .first()
+    )
+
+    if not stock:
+        raise HTTPException(
+            status_code=404,
+            detail="Stock not found",
+        )
+
+    candles = (
+        db.query(HistoricalCandle)
+        .filter(
+            HistoricalCandle.stock_id == stock.id,
+            HistoricalCandle.resolution == resolution,
+        )
+        .order_by(HistoricalCandle.recorded_at.asc())
         .limit(limit)
         .all()
     )
 
-    return price_history
+    return [
+        {
+            "time": int(candle.recorded_at.timestamp()),
+            "open": float(candle.open_price),
+            "high": float(candle.high_price),
+            "low": float(candle.low_price),
+            "close": float(candle.close_price),
+            "volume": candle.volume,
+        }
+        for candle in candles
+    ]
