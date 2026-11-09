@@ -1,3 +1,4 @@
+
 from sqlalchemy import Column, Integer, String
 from sqlalchemy.orm import relationship
 
@@ -14,3 +15,9 @@ class Stock(Base):
 
     prices = relationship("StockPrice", back_populates="stock")
     alerts = relationship("Alert", back_populates="stock")
+
+    watchlist = relationship(
+        "Watchlist",
+        back_populates="stock",
+        cascade="all, delete-orphan",
+    )

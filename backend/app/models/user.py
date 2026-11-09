@@ -1,3 +1,4 @@
+
 from sqlalchemy import Column, Integer, String, DateTime, func
 from sqlalchemy.orm import relationship
 
@@ -13,4 +14,11 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     role = Column(String(20), nullable=False, default="user")
+
     alerts = relationship("Alert", back_populates="user")
+
+    watchlist = relationship(
+        "Watchlist",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
