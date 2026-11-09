@@ -1,4 +1,3 @@
-cat > ../.gitignore <<'EOF'
 # Environment variables and secrets
 .env
 .env.*
@@ -22,7 +21,7 @@ venv/
 .DS_Store
 .vscode/
 .idea/
-EOF
+
 # Local backup files
 frontend/page.backup.tsx
 frontend/page.root-backup.tsx
