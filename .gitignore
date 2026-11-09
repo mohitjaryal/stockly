@@ -1,0 +1,25 @@
+cat > ../.gitignore <<'EOF'
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Node.js
+node_modules/
+.next/
+out/
+dist/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+.pytest_cache/
+
+# IDE and OS
+.DS_Store
+.vscode/
+.idea/
+EOF
