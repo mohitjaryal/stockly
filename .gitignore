@@ -23,3 +23,6 @@ venv/
 .vscode/
 .idea/
 EOF
+# Local backup files
+frontend/page.backup.tsx
+frontend/page.root-backup.tsx
