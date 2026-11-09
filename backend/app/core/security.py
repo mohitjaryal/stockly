@@ -1,7 +1,10 @@
+
 import os
+from pathlib import Path
 from datetime import datetime, timedelta, timezone
 
 import jwt
+from dotenv import load_dotenv
 from pwdlib import PasswordHash
 from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
@@ -9,6 +12,10 @@ from jwt.exceptions import InvalidTokenError
 
 from app.models import User
 from app.db.session import SessionLocal
+
+# Load .env from backend directory
+ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
+load_dotenv(ENV_FILE)
 
 password_hash = PasswordHash.recommended()
 
@@ -29,7 +36,9 @@ def verify_password(password: str, hashed_password: str) -> bool:
 
 def create_access_token(user_id: int, role: str) -> str:
     if not SECRET_KEY:
-        raise RuntimeError("STOCKLY_SECRET_KEY environment variable is missing")
+        raise RuntimeError(
+            f"STOCKLY_SECRET_KEY missing. Check {ENV_FILE}"
+        )
 
     expire = datetime.now(timezone.utc) + timedelta(
         minutes=ACCESS_TOKEN_EXPIRE_MINUTES
@@ -46,7 +55,9 @@ def create_access_token(user_id: int, role: str) -> str:
 
 def get_current_user(token: str = Depends(oauth2_scheme)):
     if not SECRET_KEY:
-        raise RuntimeError("STOCKLY_SECRET_KEY environment variable is missing")
+        raise RuntimeError(
+            f"STOCKLY_SECRET_KEY missing. Check {ENV_FILE}"
+        )
 
     credentials_error = HTTPException(
         status_code=401,
@@ -65,6 +76,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
         raise credentials_error
 
     db = SessionLocal()
+
     try:
         user = db.query(User).filter(User.id == user_id).first()
 
@@ -73,8 +85,10 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
 
         db.expunge(user)
         return user
+
     finally:
         db.close()
+
 
 def require_admin(current_user: User = Depends(get_current_user)):
     if current_user.role != "admin":
@@ -82,4 +96,5 @@ def require_admin(current_user: User = Depends(get_current_user)):
             status_code=403,
             detail="Admin access required",
         )
+
     return current_user
