@@ -8,3 +8,4 @@ python-dotenv
 alembic
 pytest
 httpx
+apscheduler>=3.10,<4

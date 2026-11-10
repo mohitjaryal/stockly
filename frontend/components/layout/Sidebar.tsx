@@ -1,5 +1,8 @@
 
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 const navigation = [
   { label: "Overview", href: "/", icon: "◫" },
@@ -8,10 +11,15 @@ const navigation = [
 ];
 
 export default function Sidebar() {
+  const pathname = usePathname();
+
   return (
     <aside className="fixed inset-y-0 left-0 z-30 flex w-64 flex-col border-r border-white/8 bg-[#0D1119]">
       <div className="flex h-18 items-center border-b border-white/8 px-7">
-        <Link href="/" className="text-xl font-semibold tracking-tight text-white">
+        <Link
+          href="/"
+          className="text-xl font-semibold tracking-tight text-white"
+        >
           stockly<span className="text-emerald-400">.</span>
         </Link>
       </div>
@@ -22,20 +30,31 @@ export default function Sidebar() {
         </p>
 
         <nav className="space-y-1">
-          {navigation.map((item, index) => (
-            <Link
-              key={item.label}
-              href={item.href}
-              className={`flex items-center gap-3 rounded-md px-3 py-2.5 text-[13px] transition-colors ${
-                index === 0
-                  ? "bg-white/[0.07] text-white"
-                  : "text-slate-400 hover:bg-white/4 hover:text-white"
-              }`}
-            >
-              <span className="w-5 text-center text-base">{item.icon}</span>
-              {item.label}
-            </Link>
-          ))}
+          {navigation.map((item) => {
+            const isActive =
+              item.href === "/"
+                ? pathname === "/"
+                : pathname === item.href ||
+                  pathname.startsWith(`${item.href}/`);
+
+            return (
+              <Link
+                key={item.label}
+                href={item.href}
+                className={`flex items-center gap-3 rounded-md px-3 py-2.5 text-[13px] transition-colors ${
+                  isActive
+                    ? "bg-white/[0.07] text-white"
+                    : "text-slate-400 hover:bg-white/4 hover:text-white"
+                }`}
+              >
+                <span className="w-5 text-center text-base">
+                  {item.icon}
+                </span>
+
+                {item.label}
+              </Link>
+            );
+          })}
         </nav>
       </div>
 

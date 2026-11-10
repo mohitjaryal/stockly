@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Alert,
   getAlerts,
@@ -19,6 +19,10 @@ export default function AlertPanel() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [notification, setNotification] = useState("");
+
+  const knownAlertStatuses = useRef<Map<number, string>>(new Map());
+  const isFirstLoad = useRef(true);
 
   async function loadData() {
     try {
@@ -27,12 +31,53 @@ export default function AlertPanel() {
         getStocks(),
       ]);
 
-      setAlerts(alertData);
       setStocks(stockData);
 
       if (stockData.length > 0 && !stockId) {
         setStockId(String(stockData[0].id));
       }
+
+      if (isFirstLoad.current) {
+        alertData.forEach((alert) => {
+          knownAlertStatuses.current.set(alert.id, alert.status);
+        });
+
+        isFirstLoad.current = false;
+      } else {
+        alertData.forEach((alert) => {
+          const previousStatus = knownAlertStatuses.current.get(alert.id);
+
+          if (
+            previousStatus === "active" &&
+            alert.status === "triggered"
+          ) {
+            const symbol =
+              stockData.find((stock) => stock.id === alert.stock_id)
+                ?.symbol ?? `Stock #${alert.stock_id}`;
+
+            const message = `${symbol} reached your $${Number(
+              alert.target_price
+            ).toFixed(2)} target.`;
+
+            setNotification(message);
+
+            if (
+              typeof window !== "undefined" &&
+              "Notification" in window &&
+              Notification.permission === "granted"
+            ) {
+              new Notification("Stockly Price Alert", {
+                body: message,
+              });
+            }
+          }
+
+          knownAlertStatuses.current.set(alert.id, alert.status);
+        });
+      }
+
+      setAlerts(alertData);
+      setError("");
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to load alerts"
@@ -42,7 +87,29 @@ export default function AlertPanel() {
 
   useEffect(() => {
     loadData();
+
+    const interval = window.setInterval(() => {
+      loadData();
+    }, 10000);
+
+    return () => window.clearInterval(interval);
   }, []);
+
+  async function requestNotificationPermission() {
+    if (!("Notification" in window)) {
+      setError("Browser notifications are not supported.");
+      return;
+    }
+
+    const permission = await Notification.requestPermission();
+
+    if (permission === "granted") {
+      setSuccess("Browser notifications enabled.");
+      setError("");
+    } else {
+      setError("Browser notification permission was not granted.");
+    }
+  }
 
   async function handleCreateAlert() {
     setError("");
@@ -64,6 +131,7 @@ export default function AlertPanel() {
         target_price: price,
       });
 
+      knownAlertStatuses.current.set(newAlert.id, newAlert.status);
       setAlerts((current) => [newAlert, ...current]);
       setTargetPrice("");
       setSuccess("Price alert created successfully.");
@@ -82,9 +150,13 @@ export default function AlertPanel() {
 
     try {
       await deleteAlert(alertId);
+
+      knownAlertStatuses.current.delete(alertId);
+
       setAlerts((current) =>
         current.filter((alert) => alert.id !== alertId)
       );
+
       setSuccess("Alert deleted successfully.");
     } catch (err) {
       setError(
@@ -99,12 +171,39 @@ export default function AlertPanel() {
 
   return (
     <section className="rounded-xl border border-white/10 bg-[#111827] p-5">
-      <div className="mb-5">
-        <h2 className="text-lg font-semibold text-white">Price Alerts</h2>
-        <p className="mt-1 text-sm text-gray-400">
-          Set target prices for your favorite stocks.
-        </p>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-white">Price Alerts</h2>
+          <p className="mt-1 text-sm text-gray-400">
+            Set target prices for your favorite stocks.
+          </p>
+        </div>
+
+        {"Notification" in window && (
+          <button
+            onClick={requestNotificationPermission}
+            className="rounded-lg border border-white/10 px-3 py-2 text-xs text-gray-300 transition hover:bg-white/5"
+          >
+            Enable Notifications
+          </button>
+        )}
       </div>
+
+      {notification && (
+        <div className="mb-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3">
+          <p className="text-sm font-medium text-emerald-400">
+            <span className="mr-2">🔔</span>
+            Price alert triggered!
+          </p>
+          <p className="mt-1 text-sm text-gray-300">{notification}</p>
+          <button
+            onClick={() => setNotification("")}
+            className="mt-2 text-xs text-gray-400 hover:text-white"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
@@ -162,13 +261,8 @@ export default function AlertPanel() {
         {loading ? "Creating..." : "Create Alert"}
       </button>
 
-      {error && (
-        <p className="mt-3 text-sm text-red-400">{error}</p>
-      )}
-
-      {success && (
-        <p className="mt-3 text-sm text-emerald-400">{success}</p>
-      )}
+      {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
+      {success && <p className="mt-3 text-sm text-emerald-400">{success}</p>}
 
       <div className="mt-6 border-t border-white/10 pt-5">
         <div className="mb-4 flex items-center justify-between">
@@ -193,12 +287,28 @@ export default function AlertPanel() {
                   <p className="font-medium text-white">
                     {getStockSymbol(alert.stock_id)}
                   </p>
+
                   <p className="mt-1 text-sm text-gray-400">
-                    Price {alert.condition} ${Number(alert.target_price).toFixed(2)}
+                    Price {alert.condition} $
+                    {Number(alert.target_price).toFixed(2)}
                   </p>
-                  <p className="mt-1 text-xs capitalize text-emerald-400">
+
+                  <p
+                    className={`mt-1 text-xs capitalize ${
+                      alert.status === "triggered"
+                        ? "text-emerald-400"
+                        : "text-gray-400"
+                    }`}
+                  >
                     {alert.status}
                   </p>
+
+                  {alert.triggered_at && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      Triggered:{" "}
+                      {new Date(alert.triggered_at).toLocaleString()}
+                    </p>
+                  )}
                 </div>
 
                 <button

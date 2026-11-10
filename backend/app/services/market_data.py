@@ -10,15 +10,43 @@ FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY")
 BASE_URL = "https://finnhub.io/api/v1"
 
 
-# Get Latest Stock Quote from Finnhub
-def get_stock_quote(symbol: str):
+def get_finnhub_headers():
     if not FINNHUB_API_KEY:
         raise ValueError("FINNHUB_API_KEY missing in .env")
 
+    return {"X-Finnhub-Token": FINNHUB_API_KEY}
+
+
+# Search stocks by company name or ticker
+def search_stock_symbols(query: str, exchange: str | None = None):
+    query = query.strip()
+
+    if not query:
+        raise ValueError("Search query cannot be empty")
+
+    params = {"q": query}
+
+    if exchange:
+        params["exchange"] = exchange.upper()
+
+    response = httpx.get(
+        f"{BASE_URL}/search",
+        params=params,
+        headers=get_finnhub_headers(),
+        timeout=10,
+    )
+
+    response.raise_for_status()
+
+    return response.json()
+
+
+# Get Latest Stock Quote from Finnhub
+def get_stock_quote(symbol: str):
     response = httpx.get(
         f"{BASE_URL}/quote",
         params={"symbol": symbol.upper()},
-        headers={"X-Finnhub-Token": FINNHUB_API_KEY},
+        headers=get_finnhub_headers(),
         timeout=10,
     )
 

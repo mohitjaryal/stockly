@@ -1,6 +1,4 @@
 
-
-
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from decimal import Decimal
@@ -12,8 +10,11 @@ from app.models import User, Stock, StockPrice, HistoricalCandle
 from app.schemas.stock import StockCreate, StockResponse
 from app.schemas.stock_price import StockPriceResponse
 from app.core.security import require_admin
-from app.services.market_data import get_stock_quote, get_stock_candles
-
+from app.services.market_data import (
+    get_stock_quote,
+    get_stock_candles,
+    search_stock_symbols,
+)
 
 router = APIRouter(prefix="/stocks", tags=["Stocks"])
 
@@ -66,6 +67,50 @@ def list_stocks(db: Session = Depends(get_db)):
     return db.query(Stock).order_by(Stock.symbol).all()
 
 
+# GET - Search Stocks
+# Keep this route before /{symbol}
+@router.get("/search")
+def search_stocks(
+    q: str = Query(..., min_length=1, max_length=100),
+    exchange: str | None = Query(default=None, min_length=1, max_length=20),
+):
+    query = q.strip()
+
+    if not query:
+        raise HTTPException(
+            status_code=400,
+            detail="Search query cannot be empty",
+        )
+
+    try:
+        data = search_stock_symbols(query, exchange)
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Stock search is not configured",
+        ) from exc
+
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="Stock search provider returned an error",
+        ) from exc
+
+    except httpx.RequestError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="Could not connect to stock search provider",
+        ) from exc
+
+    results = data.get("result", [])
+
+    return {
+        "count": len(results),
+        "result": results,
+    }
+
+
 # GET - Single Stock
 @router.get("/{symbol}", response_model=StockResponse)
 def get_stock(
@@ -87,7 +132,7 @@ def get_stock(
     return stock
 
 
-# GET - Latest Live Stock Price
+# GET - Latest Stock Price
 @router.get("/{symbol}/price", response_model=StockPriceResponse)
 def get_latest_stock_price(
     symbol: str,
@@ -105,7 +150,6 @@ def get_latest_stock_price(
             detail="Stock not found",
         )
 
-    # Fetch quote from Finnhub
     try:
         quote = get_stock_quote(stock.symbol)
 
@@ -123,7 +167,6 @@ def get_latest_stock_price(
             detail="Live stock price not available",
         )
 
-    # Convert Finnhub timestamp to datetime
     quote_timestamp = quote.get("t")
 
     recorded_at = (
@@ -135,7 +178,6 @@ def get_latest_stock_price(
         else datetime.now(timezone.utc)
     )
 
-    # Check for an existing record with the same timestamp
     existing_price = (
         db.query(StockPrice)
         .filter(
@@ -147,19 +189,16 @@ def get_latest_stock_price(
 
     if existing_price:
         existing_price.price = Decimal(str(current_price))
-
         existing_price.open_price = (
             Decimal(str(quote["o"]))
             if quote.get("o") is not None
             else None
         )
-
         existing_price.high_price = (
             Decimal(str(quote["h"]))
             if quote.get("h") is not None
             else None
         )
-
         existing_price.low_price = (
             Decimal(str(quote["l"]))
             if quote.get("l") is not None
@@ -169,14 +208,12 @@ def get_latest_stock_price(
         try:
             db.commit()
             db.refresh(existing_price)
-
         except Exception:
             db.rollback()
             raise
 
         return existing_price
 
-    # Create a new price record
     price_record = StockPrice(
         stock_id=stock.id,
         price=Decimal(str(current_price)),
@@ -202,7 +239,6 @@ def get_latest_stock_price(
         db.add(price_record)
         db.commit()
         db.refresh(price_record)
-
     except Exception:
         db.rollback()
         raise
@@ -210,8 +246,7 @@ def get_latest_stock_price(
     return price_record
 
 
-
-# GET - Historical Stock Candles from Yahoo Finance
+# GET - Historical Stock Candles
 @router.get("/{symbol}/history", response_model=list[dict])
 def get_stock_price_history(
     symbol: str,
@@ -231,7 +266,6 @@ def get_stock_price_history(
             detail="Stock not found",
         )
 
-    # Fetch historical candles from Yahoo Finance
     try:
         candles = get_stock_candles(
             symbol=stock.symbol,
@@ -251,7 +285,6 @@ def get_stock_price_history(
             detail="Historical market data provider request failed",
         ) from exc
 
-    # Save candles in PostgreSQL
     try:
         for candle in candles:
             recorded_at = datetime.fromtimestamp(
@@ -301,7 +334,8 @@ def get_stock_price_history(
 
     return candles
 
-# GET - Historical Candles from PostgreSQL
+
+# GET - Historical Candles from Database
 @router.get("/{symbol}/history/db", response_model=list[dict])
 def get_saved_stock_history(
     symbol: str,
