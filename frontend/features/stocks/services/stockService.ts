@@ -1,3 +1,4 @@
+
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -19,13 +20,80 @@ export interface StockPrice {
   recorded_at: string;
 }
 
+export interface StockSearchResult {
+  symbol: string;
+  description: string;
+  displaySymbol?: string;
+  type?: string;
+}
+
+function getAuthHeaders(): HeadersInit {
+  const token = localStorage.getItem("stockly_token");
+
+  if (!token) {
+    throw new Error("Please login first");
+  }
+
+  return {
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
+  };
+}
+
+async function handleResponse(response: Response) {
+  if (!response.ok) {
+    const error = await response.json().catch(() => null);
+    throw new Error(error?.detail || "Something went wrong");
+  }
+
+  return response;
+}
+
 export async function getStocks(): Promise<Stock[]> {
   const response = await fetch(`${API_BASE_URL}/stocks/`);
 
-  if (!response.ok) {
-    throw new Error("Failed to fetch stocks");
+  await handleResponse(response);
+  return response.json();
+}
+
+export async function searchStocks(
+  query: string,
+  exchange?: string
+): Promise<StockSearchResult[]> {
+  const params = new URLSearchParams({ q: query });
+
+  if (exchange) {
+    params.set("exchange", exchange);
   }
 
+  const response = await fetch(
+    `${API_BASE_URL}/stocks/search?${params.toString()}`,
+    { cache: "no-store" }
+  );
+
+  await handleResponse(response);
+
+  const data = await response.json();
+  return data.result ?? [];
+}
+
+export async function addStock(
+  stock: StockSearchResult
+): Promise<Stock> {
+  const response = await fetch(`${API_BASE_URL}/stocks/add`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({
+      symbol: stock.symbol,
+      company_name: stock.description,
+      exchange: stock.symbol.endsWith(".NS") ||
+        stock.symbol.endsWith(".BO")
+        ? "NSE/BSE"
+        : "US",
+    }),
+  });
+
+  await handleResponse(response);
   return response.json();
 }
 
@@ -37,10 +105,7 @@ export async function getStockPrice(
     { cache: "no-store" }
   );
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch ${symbol} price`);
-  }
-
+  await handleResponse(response);
   return response.json();
 }
 
@@ -65,9 +130,6 @@ export async function getStockHistory(
     { cache: "no-store" }
   );
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch ${symbol} history`);
-  }
-
+  await handleResponse(response);
   return response.json();
 }

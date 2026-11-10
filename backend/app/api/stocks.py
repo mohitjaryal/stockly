@@ -1,6 +1,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from decimal import Decimal
 from datetime import datetime, timezone
 import httpx
@@ -9,7 +10,7 @@ from app.db.session import SessionLocal
 from app.models import User, Stock, StockPrice, HistoricalCandle
 from app.schemas.stock import StockCreate, StockResponse
 from app.schemas.stock_price import StockPriceResponse
-from app.core.security import require_admin
+from app.core.security import require_admin, get_current_user
 from app.services.market_data import (
     get_stock_quote,
     get_stock_candles,
@@ -27,7 +28,7 @@ def get_db():
         db.close()
 
 
-# POST - Create Stock
+# POST - Create Stock (Admin Only)
 @router.post("/", response_model=StockResponse, status_code=201)
 def create_stock(
     stock_data: StockCreate,
@@ -35,12 +36,24 @@ def create_stock(
     admin: User = Depends(require_admin),
 ):
     symbol = stock_data.symbol.strip().upper()
+    company_name = stock_data.company_name.strip()
+    exchange = stock_data.exchange.strip() if stock_data.exchange else None
 
-    existing_stock = (
-        db.query(Stock)
-        .filter(Stock.symbol == symbol)
-        .first()
-    )
+    if not symbol or not company_name:
+        raise HTTPException(
+            status_code=400,
+            detail="Symbol and company name are required",
+        )
+
+    if len(symbol) > 20 or len(company_name) > 255:
+        raise HTTPException(
+            status_code=400,
+            detail="Stock symbol or company name exceeds allowed length",
+        )
+
+    existing_stock = db.query(Stock).filter(
+        Stock.symbol == symbol
+    ).first()
 
     if existing_stock:
         raise HTTPException(
@@ -50,21 +63,99 @@ def create_stock(
 
     stock = Stock(
         symbol=symbol,
-        company_name=stock_data.company_name,
-        exchange=stock_data.exchange,
+        company_name=company_name,
+        exchange=exchange,
     )
 
-    db.add(stock)
-    db.commit()
-    db.refresh(stock)
+    try:
+        db.add(stock)
+        db.commit()
+        db.refresh(stock)
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Stock already exists",
+        ) from exc
+
+    return stock
+
+
+# POST - Add Stock (Authenticated Users)
+@router.post("/add", response_model=StockResponse, status_code=201)
+def add_stock(
+    stock_data: StockCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    symbol = stock_data.symbol.strip().upper()
+    company_name = stock_data.company_name.strip()
+    exchange = stock_data.exchange.strip() if stock_data.exchange else None
+
+    if not symbol or not company_name:
+        raise HTTPException(
+            status_code=400,
+            detail="Symbol and company name are required",
+        )
+
+    if len(symbol) > 20:
+        raise HTTPException(
+            status_code=400,
+            detail="Stock symbol cannot exceed 20 characters",
+        )
+
+    if len(company_name) > 255:
+        raise HTTPException(
+            status_code=400,
+            detail="Company name cannot exceed 255 characters",
+        )
+
+    if exchange and len(exchange) > 50:
+        raise HTTPException(
+            status_code=400,
+            detail="Exchange cannot exceed 50 characters",
+        )
+
+    existing_stock = db.query(Stock).filter(
+        Stock.symbol == symbol
+    ).first()
+
+    if existing_stock:
+        raise HTTPException(
+            status_code=409,
+            detail=f"{symbol} already exists in Stockly",
+        )
+
+    stock = Stock(
+        symbol=symbol,
+        company_name=company_name,
+        exchange=exchange,
+    )
+
+    try:
+        db.add(stock)
+        db.commit()
+        db.refresh(stock)
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail=f"{symbol} already exists in Stockly",
+        ) from exc
 
     return stock
 
 
 # GET - All Stocks
 @router.get("/", response_model=list[StockResponse])
-def list_stocks(db: Session = Depends(get_db)):
-    return db.query(Stock).order_by(Stock.symbol).all()
+def list_stocks(
+    db: Session = Depends(get_db),
+):
+    return (
+        db.query(Stock)
+        .order_by(Stock.symbol)
+        .all()
+    )
 
 
 # GET - Search Stocks
@@ -72,9 +163,11 @@ def list_stocks(db: Session = Depends(get_db)):
 @router.get("/search")
 def search_stocks(
     q: str = Query(..., min_length=1, max_length=100),
-    exchange: str | None = Query(default=None, min_length=1, max_length=20),
+    exchange: str | None = Query(default=None, max_length=20),
 ):
     query = q.strip()
+    exchange_filter = exchange.strip() if exchange else None
+    exchange_filter = exchange_filter or None
 
     if not query:
         raise HTTPException(
@@ -83,7 +176,7 @@ def search_stocks(
         )
 
     try:
-        data = search_stock_symbols(query, exchange)
+        data = search_stock_symbols(query, exchange_filter)
 
     except ValueError as exc:
         raise HTTPException(
@@ -150,10 +243,29 @@ def get_latest_stock_price(
             detail="Stock not found",
         )
 
+    # Fetch quote from the appropriate provider
     try:
         quote = get_stock_quote(stock.symbol)
 
-    except (httpx.HTTPError, ValueError) as exc:
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+        ) from exc
+
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="Market data provider rejected the quote request",
+        ) from exc
+
+    except httpx.RequestError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="Could not connect to market data provider",
+        ) from exc
+
+    except Exception as exc:
         raise HTTPException(
             status_code=502,
             detail="Market data provider request failed",
@@ -164,7 +276,7 @@ def get_latest_stock_price(
     if current_price is None or current_price <= 0:
         raise HTTPException(
             status_code=404,
-            detail="Live stock price not available",
+            detail="Latest stock price is not available",
         )
 
     quote_timestamp = quote.get("t")
@@ -187,23 +299,29 @@ def get_latest_stock_price(
         .first()
     )
 
+    open_price = (
+        Decimal(str(quote["o"]))
+        if quote.get("o") is not None
+        else None
+    )
+
+    high_price = (
+        Decimal(str(quote["h"]))
+        if quote.get("h") is not None
+        else None
+    )
+
+    low_price = (
+        Decimal(str(quote["l"]))
+        if quote.get("l") is not None
+        else None
+    )
+
     if existing_price:
         existing_price.price = Decimal(str(current_price))
-        existing_price.open_price = (
-            Decimal(str(quote["o"]))
-            if quote.get("o") is not None
-            else None
-        )
-        existing_price.high_price = (
-            Decimal(str(quote["h"]))
-            if quote.get("h") is not None
-            else None
-        )
-        existing_price.low_price = (
-            Decimal(str(quote["l"]))
-            if quote.get("l") is not None
-            else None
-        )
+        existing_price.open_price = open_price
+        existing_price.high_price = high_price
+        existing_price.low_price = low_price
 
         try:
             db.commit()
@@ -217,21 +335,9 @@ def get_latest_stock_price(
     price_record = StockPrice(
         stock_id=stock.id,
         price=Decimal(str(current_price)),
-        open_price=(
-            Decimal(str(quote["o"]))
-            if quote.get("o") is not None
-            else None
-        ),
-        high_price=(
-            Decimal(str(quote["h"]))
-            if quote.get("h") is not None
-            else None
-        ),
-        low_price=(
-            Decimal(str(quote["l"]))
-            if quote.get("l") is not None
-            else None
-        ),
+        open_price=open_price,
+        high_price=high_price,
+        low_price=low_price,
         recorded_at=recorded_at,
     )
 

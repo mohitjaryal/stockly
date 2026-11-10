@@ -42,16 +42,54 @@ def search_stock_symbols(query: str, exchange: str | None = None):
 
 
 # Get Latest Stock Quote from Finnhub
+
 def get_stock_quote(symbol: str):
+    symbol = symbol.strip().upper()
+
+    # Indian stocks: use Yahoo Finance
+    if symbol.endswith(".NS") or symbol.endswith(".BO"):
+        ticker = yf.Ticker(symbol)
+
+        history = ticker.history(
+            period="5d",
+            interval="1d",
+            auto_adjust=False,
+        )
+
+        if history.empty:
+            raise ValueError(
+                f"No quote data available for Indian stock: {symbol}"
+            )
+
+        # Latest available trading session
+        row = history.iloc[-1]
+        timestamp = history.index[-1]
+
+        return {
+            "c": float(row["Close"]),
+            "o": float(row["Open"]),
+            "h": float(row["High"]),
+            "l": float(row["Low"]),
+            "t": int(timestamp.timestamp()),
+        }
+
+    # US and other supported stocks: use Finnhub
     response = httpx.get(
         f"{BASE_URL}/quote",
-        params={"symbol": symbol.upper()},
+        params={"symbol": symbol},
         headers=get_finnhub_headers(),
         timeout=10,
     )
 
     response.raise_for_status()
-    return response.json()
+    quote = response.json()
+
+    if not isinstance(quote, dict):
+        raise ValueError("Invalid quote response from Finnhub")
+
+    return quote
+
+
 
 
 # Get Historical Stock Candles from Yahoo Finance
