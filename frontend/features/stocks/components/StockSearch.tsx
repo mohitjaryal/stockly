@@ -1,20 +1,32 @@
 
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { getStocks, type Stock } from "../services/stockService";
+import { useEffect, useState } from "react";
+import {
+  getStocks,
+  searchStocks,
+  addStock,
+  type Stock,
+  type StockSearchResult,
+} from "../services/stockService";
 
 interface StockSearchProps {
   onSelect: (stock: Stock) => void;
 }
 
+type MarketFilter = "ALL" | "US" | "INDIA";
+
 export default function StockSearch({ onSelect }: StockSearchProps) {
-  const [stocks, setStocks] = useState<Stock[]>([]);
   const [query, setQuery] = useState("");
-  const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [market, setMarket] = useState<MarketFilter>("ALL");
+
+  const [stocks, setStocks] = useState<Stock[]>([]);
+  const [results, setResults] = useState<StockSearchResult[]>([]);
+
+  const [loading, setLoading] = useState(false);
+  const [addingSymbol, setAddingSymbol] = useState("");
   const [error, setError] = useState("");
-  const [isOpen, setIsOpen] = useState(false);
+  const [success, setSuccess] = useState("");
 
   useEffect(() => {
     async function loadStocks() {
@@ -22,115 +34,231 @@ export default function StockSearch({ onSelect }: StockSearchProps) {
         const data = await getStocks();
         setStocks(data);
       } catch {
-        setError("Unable to load stocks. Please try again.");
-      } finally {
-        setLoading(false);
+        setError("Unable to load saved stocks.");
       }
     }
 
     loadStocks();
   }, []);
 
-  const filteredStocks = useMemo(() => {
-    const search = query.trim().toLowerCase();
+  useEffect(() => {
+    const search = query.trim();
 
-    if (!search) return [];
+    if (!search) {
+      setResults([]);
+      setLoading(false);
+      return;
+    }
 
-    return stocks
-      .filter(
-        (stock) =>
-          stock.symbol.toLowerCase().includes(search) ||
-          stock.company_name.toLowerCase().includes(search) ||
-          stock.exchange.toLowerCase().includes(search)
-      )
-      .slice(0, 8);
-  }, [stocks, query]);
+    let cancelled = false;
 
-  function selectStock(stock: Stock) {
-    setSelectedStock(stock);
-    setQuery(stock.symbol);
-    setIsOpen(false);
+    const timeout = setTimeout(async () => {
+      setLoading(true);
+      setError("");
+      setSuccess("");
+
+      try {
+        const data = await searchStocks(
+          search,
+          market === "US" ? "US" : undefined
+        );
+
+        if (cancelled) return;
+
+        let filtered = data;
+
+        if (market === "INDIA") {
+          filtered = data.filter(
+            (stock) =>
+              stock.symbol.toUpperCase().endsWith(".NS") ||
+              stock.symbol.toUpperCase().endsWith(".BO")
+          );
+        }
+
+        setResults(filtered.slice(0, 10));
+      } catch (err) {
+        if (cancelled) return;
+
+        setResults([]);
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Stock search failed. Please try again."
+        );
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }, 350);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
+  }, [query, market]);
+
+  function findSavedStock(symbol: string) {
+    return stocks.find(
+      (stock) => stock.symbol.toUpperCase() === symbol.toUpperCase()
+    );
+  }
+
+  function selectSavedStock(stock: Stock) {
     onSelect(stock);
+    setQuery(stock.symbol);
+    setResults([]);
+    setSuccess(`${stock.symbol} selected.`);
+    setError("");
+  }
+
+  async function handleAddStock(result: StockSearchResult) {
+    setAddingSymbol(result.symbol);
+    setError("");
+    setSuccess("");
+
+    try {
+      const existing = findSavedStock(result.symbol);
+
+      if (existing) {
+        selectSavedStock(existing);
+        return;
+      }
+
+      const stock = await addStock(result);
+
+      setStocks((previous) => [...previous, stock]);
+
+      onSelect(stock);
+      setQuery(stock.symbol);
+      setResults([]);
+
+      setSuccess(`${stock.symbol} added to Stockly successfully.`);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to add this stock."
+      );
+    } finally {
+      setAddingSymbol("");
+    }
   }
 
   return (
     <section className="rounded-lg border border-white/[0.08] bg-[#111722] p-5">
       <div className="mb-4">
-        <h2 className="text-sm font-semibold text-white">Search stocks</h2>
+        <h2 className="text-sm font-semibold text-white">
+          Search stocks
+        </h2>
+
         <p className="mt-1 text-xs text-slate-500">
-          Search by company name or stock symbol
+          Discover stocks from US and Indian markets.
         </p>
       </div>
 
-      <div className="relative">
-        <input
-          type="text"
-          value={query}
-          onChange={(event) => {
-            setQuery(event.target.value);
-            setSelectedStock(null);
-            setIsOpen(true);
-          }}
-          onFocus={() => setIsOpen(true)}
-          onBlur={() => setTimeout(() => setIsOpen(false), 150)}
-          placeholder="Search AAPL, Apple, Google..."
-          className="w-full rounded-md border border-white/10 bg-[#151d2a] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-emerald-400/50"
-        />
-
-        {isOpen && query.trim() !== "" && (
-          <div className="absolute left-0 right-0 top-full z-20 mt-2 max-h-72 overflow-y-auto rounded-md border border-white/10 bg-[#151d2a] shadow-xl">
-            {filteredStocks.length > 0 ? (
-              filteredStocks.map((stock) => (
-                <button
-                  key={stock.id}
-                  type="button"
-                  onMouseDown={() => selectStock(stock)}
-                  className="flex w-full items-center justify-between border-b border-white/[0.06] px-4 py-3 text-left last:border-0 hover:bg-white/[0.05]"
-                >
-                  <div>
-                    <p className="text-sm font-medium text-white">
-                      {stock.symbol}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-400">
-                      {stock.company_name}
-                    </p>
-                  </div>
-                  <span className="text-xs text-slate-500">
-                    {stock.exchange}
-                  </span>
-                </button>
-              ))
-            ) : (
-              <p className="px-4 py-4 text-xs text-slate-400">
-                No matching stocks found.
-              </p>
-            )}
-          </div>
-        )}
+      <div className="mb-4 flex flex-wrap gap-2">
+        {(["ALL", "US", "INDIA"] as MarketFilter[]).map((item) => (
+          <button
+            key={item}
+            type="button"
+            onClick={() => setMarket(item)}
+            className={`rounded-md px-4 py-2 text-xs font-medium transition ${
+              market === item
+                ? "bg-emerald-400/15 text-emerald-400"
+                : "border border-white/10 text-slate-400 hover:bg-white/5"
+            }`}
+          >
+            {item === "ALL"
+              ? "All markets"
+              : item === "US"
+                ? "US market"
+                : "Indian market"}
+          </button>
+        ))}
       </div>
 
+      <input
+        type="text"
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        placeholder="Search AAPL, Apple, RELIANCE..."
+        className="w-full rounded-md border border-white/10 bg-[#151d2a] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-emerald-400/50"
+      />
+
       {loading && (
-        <p className="mt-3 text-xs text-slate-500">Loading stocks...</p>
+        <p className="mt-3 text-xs text-slate-500">
+          Searching stocks...
+        </p>
       )}
 
       {error && (
-        <p className="mt-3 text-xs text-red-400">{error}</p>
+        <p className="mt-3 text-xs text-red-400">
+          {error}
+        </p>
       )}
 
-      {selectedStock && (
-        <div className="mt-4 rounded-md border border-emerald-400/20 bg-emerald-400/[0.05] p-4">
-          <p className="text-xs text-emerald-400">Selected stock</p>
-          <p className="mt-2 text-lg font-semibold text-white">
-            {selectedStock.symbol}
-          </p>
-          <p className="mt-1 text-sm text-slate-400">
-            {selectedStock.company_name}
-          </p>
-          <p className="mt-1 text-xs text-slate-500">
-            {selectedStock.exchange}
-          </p>
+      {success && (
+        <p className="mt-3 text-xs text-emerald-400">
+          {success}
+        </p>
+      )}
+
+      {!loading && query.trim() && results.length === 0 && !error && (
+        <p className="mt-4 text-xs text-slate-500">
+          No matching stocks found.
+        </p>
+      )}
+
+      {results.length > 0 && (
+        <div className="mt-4 overflow-hidden rounded-md border border-white/10">
+          {results.map((result) => {
+            const savedStock = findSavedStock(result.symbol);
+
+            return (
+              <div
+                key={result.symbol}
+                className="flex flex-col gap-3 border-b border-white/[0.06] p-4 last:border-0 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-white">
+                    {result.symbol}
+                  </p>
+
+                  <p className="mt-1 text-xs text-slate-400">
+                    {result.description}
+                  </p>
+
+                  {result.type && (
+                    <p className="mt-1 text-xs text-slate-500">
+                      {result.type}
+                    </p>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  disabled={addingSymbol === result.symbol}
+                  onClick={() => handleAddStock(result)}
+                  className="shrink-0 rounded-md border border-emerald-400/20 bg-emerald-400/10 px-4 py-2 text-xs font-medium text-emerald-400 transition hover:bg-emerald-400/20 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {addingSymbol === result.symbol
+                    ? "Adding..."
+                    : savedStock
+                      ? "Select"
+                      : "Add to Stockly"}
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
+
+      <div className="mt-5 border-t border-white/[0.06] pt-4">
+        <p className="text-xs text-slate-500">
+          Saved stocks: {stocks.length}
+        </p>
+      </div>
     </section>
   );
 }

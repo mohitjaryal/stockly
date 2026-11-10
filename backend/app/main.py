@@ -11,6 +11,7 @@ from app.api.auth import router as auth_router
 from app.api.alerts import router as alerts_router
 from app.api.watchlist import router as watchlist_router
 from app.services.alert_monitor import check_active_alerts
+from app.api.mutual_funds import router as mutual_funds_router
 
 
 scheduler = BackgroundScheduler(timezone="UTC")
@@ -59,7 +60,7 @@ app.include_router(stocks_router)
 app.include_router(auth_router)
 app.include_router(alerts_router)
 app.include_router(watchlist_router)
-
+app.include_router(mutual_funds_router)
 
 @app.get("/")
 def root():
