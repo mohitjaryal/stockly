@@ -1,31 +1,13 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import StockPriceCards from "@/features/stocks/components/StockPriceCards";
 import StockHistoryChart from "@/features/stocks/components/StockHistoryChart";
 import StockSearch from "@/features/stocks/components/StockSearch";
-import WatchlistPanel from "@/features/watchlist/components/WatchlistPanel";
-import AlertPanel from "@/features/alerts/components/AlertPanel";
+import { getWatchlist } from "@/features/watchlist/services/watchlistService";
+import { getAlerts } from "@/features/alerts/services/alertService";
 import type { Stock } from "@/features/stocks/services/stockService";
-
-const marketStats = [
-  {
-    label: "Market status",
-    value: "Awaiting data",
-    detail: "Latest available market data",
-  },
-  {
-    label: "Watchlist",
-    value: "—",
-    detail: "Tracked stocks",
-  },
-  {
-    label: "Price alerts",
-    value: "—",
-    detail: "Active alerts",
-  },
-];
 
 export default function DashboardPage() {
   const [selectedStock, setSelectedStock] = useState<Stock>({
@@ -34,6 +16,67 @@ export default function DashboardPage() {
     company_name: "Alphabet Inc.",
     exchange: "NASDAQ",
   });
+
+  const [watchlistCount, setWatchlistCount] = useState<number | null>(null);
+  const [activeAlertsCount, setActiveAlertsCount] = useState<number | null>(
+    null
+  );
+  const [isLoadingStats, setIsLoadingStats] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadDashboardStats() {
+      const [watchlistResult, alertsResult] = await Promise.allSettled([
+        getWatchlist(),
+        getAlerts(),
+      ]);
+
+      if (!isMounted) return;
+
+      if (watchlistResult.status === "fulfilled") {
+        setWatchlistCount(watchlistResult.value.length);
+      }
+
+      if (alertsResult.status === "fulfilled") {
+        const activeAlerts = alertsResult.value.filter(
+          (alert) => alert.status === "active"
+        );
+
+        setActiveAlertsCount(activeAlerts.length);
+      }
+
+      setIsLoadingStats(false);
+    }
+
+    loadDashboardStats();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const marketStats = [
+    {
+      label: "Market status",
+      value: "Awaiting data",
+      detail: "Latest available market data",
+    },
+    {
+      label: "Watchlist",
+      value: isLoadingStats
+        ? "..."
+        : watchlistCount?.toString() ?? "—",
+      detail: "Tracked stocks",
+    },
+    {
+      label: "Price alerts",
+      value: isLoadingStats
+        ? "..."
+        : activeAlertsCount?.toString() ?? "—",
+      detail: "Active alerts",
+    },
+  ];
 
   return (
     <div className="space-y-8">
@@ -69,9 +112,7 @@ export default function DashboardPage() {
               {stat.value}
             </p>
 
-            <p className="mt-2 text-xs text-slate-500">
-              {stat.detail}
-            </p>
+            <p className="mt-2 text-xs text-slate-500">{stat.detail}</p>
           </div>
         ))}
       </section>
@@ -80,7 +121,7 @@ export default function DashboardPage() {
 
       <StockPriceCards symbol={selectedStock.symbol} />
 
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <section>
         <div className="min-h-90 rounded-lg border border-white/8 bg-[#111722] p-5">
           <div>
             <h2 className="text-sm font-semibold text-white">
@@ -96,18 +137,7 @@ export default function DashboardPage() {
             <StockHistoryChart symbol={selectedStock.symbol} />
           </div>
         </div>
-
-        <WatchlistPanel
-          onSelect={(stock) =>
-            setSelectedStock((current) => ({
-              ...current,
-              ...stock,
-            }))
-          }
-        />
       </section>
-
-      <AlertPanel />
     </div>
   );
 }
