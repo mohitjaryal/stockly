@@ -29,3 +29,530 @@ body {
 button {
   cursor: pointer;
 }
+
+
+/* Stockly landing page motion */
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 90px;
+}
+
+.stockly-hero-content {
+  animation: stocklyHeroIn 850ms cubic-bezier(.2,.75,.25,1) both;
+}
+
+.stockly-reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition:
+    opacity 750ms cubic-bezier(.2,.75,.25,1),
+    transform 750ms cubic-bezier(.2,.75,.25,1);
+}
+
+.stockly-reveal.stockly-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.stockly-float {
+  animation: stocklyFloat 7s ease-in-out infinite;
+}
+
+.stockly-chart-line {
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  animation: stocklyDrawChart 2.2s ease-out 500ms forwards;
+}
+
+@keyframes stocklyHeroIn {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes stocklyFloat {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-9px);
+  }
+}
+
+@keyframes stocklyDrawChart {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .stockly-hero-content,
+  .stockly-float,
+  .stockly-chart-line {
+    animation: none !important;
+  }
+
+  .stockly-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+
+/* =========================================
+   STOCKLY LANDING PAGE ANIMATIONS
+========================================= */
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 90px;
+}
+
+/* Hero entrance */
+.stockly-hero-content {
+  animation: stocklyHeroIn 900ms cubic-bezier(.2,.75,.25,1) both;
+}
+
+@keyframes stocklyHeroIn {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Scroll reveal */
+.stockly-reveal {
+  opacity: 0;
+  transform: translateY(26px);
+  transition:
+    opacity 750ms cubic-bezier(.2,.75,.25,1),
+    transform 750ms cubic-bezier(.2,.75,.25,1);
+}
+
+.stockly-reveal.stockly-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Dashboard floating */
+.stockly-float {
+  animation: stocklyFloat 7s ease-in-out infinite;
+}
+
+@keyframes stocklyFloat {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-9px);
+  }
+}
+
+/* Stat cards */
+.stockly-stat-card {
+  opacity: 0;
+  animation: stocklyCardIn 750ms cubic-bezier(.2,.75,.25,1) forwards;
+  transition:
+    transform 300ms ease,
+    border-color 300ms ease,
+    box-shadow 300ms ease;
+}
+
+.stockly-stat-card:hover {
+  transform: translateY(-5px);
+  border-color: rgba(52,211,153,.35);
+  box-shadow: 0 12px 30px rgba(16,185,129,.08);
+}
+
+.stockly-delay-1 {
+  animation-delay: 200ms;
+}
+
+.stockly-delay-2 {
+  animation-delay: 400ms;
+}
+
+@keyframes stocklyCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Chart drawing */
+.stockly-chart-card {
+  animation: stocklyCardIn 900ms ease both;
+  animation-delay: 450ms;
+}
+
+.stockly-chart-line {
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  animation: stocklyDrawChart 2.6s cubic-bezier(.3,.7,.2,1) 700ms forwards;
+}
+
+@keyframes stocklyDrawChart {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Chart endpoint glow */
+.stockly-chart-end {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: stocklyPulse 2s ease-in-out infinite;
+}
+
+@keyframes stocklyPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: .55;
+    transform: scale(1.7);
+  }
+}
+
+/* Market rows */
+.stockly-market-row {
+  opacity: 0;
+  animation: stocklyRowIn 600ms ease forwards;
+  transition: background 250ms ease;
+}
+
+.stockly-market-row:hover {
+  background: rgba(255,255,255,.035);
+}
+
+@keyframes stocklyRowIn {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .stockly-hero-content,
+  .stockly-float,
+  .stockly-stat-card,
+  .stockly-chart-card,
+  .stockly-chart-line,
+  .stockly-chart-end,
+  .stockly-market-row {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .stockly-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+
+/* Responsive Stockly login animations */
+
+.login-grid-bg {
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.045) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(to bottom, black, transparent 90%);
+}
+
+.login-enter {
+  animation: loginEnter 650ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+@keyframes loginEnter {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.login-float {
+  animation: loginFloat 7s ease-in-out infinite;
+}
+
+@keyframes loginFloat {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+.login-ticker-track {
+  animation: loginTicker 34s linear infinite;
+  will-change: transform;
+}
+
+.login-ticker-track:hover {
+  animation-play-state: paused;
+}
+
+@keyframes loginTicker {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.login-chart-line {
+  stroke-dasharray: 700;
+  stroke-dashoffset: 700;
+  animation: loginChartDraw 2.2s 300ms ease-out forwards;
+}
+
+.login-chart-dot {
+  opacity: 0;
+  animation: loginDotAppear 400ms 2.5s ease-out forwards,
+    loginDotPulse 2s 3s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@keyframes loginChartDraw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes loginDotAppear {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes loginDotPulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.6);
+  }
+}
+
+.login-error {
+  animation: loginErrorIn 220ms ease-out both;
+}
+
+@keyframes loginErrorIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Smaller screens: keep login compact and remove heavy decoration */
+@media (max-width: 1023px) {
+  .login-grid-bg {
+    background-size: 36px 36px;
+    opacity: 0.2;
+  }
+}
+
+@media (max-width: 480px) {
+  .login-page {
+    min-height: 100svh;
+  }
+
+  .login-enter,
+  .login-float {
+    animation: none;
+  }
+}
+
+/* Respect device accessibility settings */
+@media (prefers-reduced-motion: reduce) {
+  .login-enter,
+  .login-float,
+  .login-ticker-track,
+  .login-chart-line,
+  .login-chart-dot,
+  .login-error {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+
+/* Stockly - distinct signup onboarding design */
+
+.signup-modern {
+  isolation: isolate;
+}
+
+.signup-orb {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 9999px;
+  filter: blur(100px);
+  z-index: 0;
+}
+
+.signup-orb-one {
+  width: 360px;
+  height: 360px;
+  top: 10%;
+  left: -180px;
+  background: rgba(16, 185, 129, 0.09);
+}
+
+.signup-orb-two {
+  width: 320px;
+  height: 320px;
+  bottom: 0;
+  right: -160px;
+  background: rgba(20, 184, 166, 0.08);
+}
+
+.signup-modern-enter {
+  animation: signupModernEnter 650ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+@keyframes signupModernEnter {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.signup-benefit {
+  opacity: 0;
+  animation: signupBenefitIn 550ms ease-out forwards;
+}
+
+@keyframes signupBenefitIn {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.signup-card-back {
+  animation: signupCardBack 6s ease-in-out infinite;
+}
+
+.signup-card-front {
+  animation: signupCardFront 6s ease-in-out infinite;
+}
+
+@keyframes signupCardBack {
+  0%, 100% {
+    transform: translate(0, 0) rotate(2deg);
+  }
+  50% {
+    transform: translate(5px, -7px) rotate(0deg);
+  }
+}
+
+@keyframes signupCardFront {
+  0%, 100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(-4px, 5px);
+  }
+}
+
+.signup-message {
+  animation: signupMessageIn 220ms ease-out both;
+}
+
+@keyframes signupMessageIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 1023px) {
+  .signup-orb {
+    filter: blur(80px);
+  }
+}
+
+@media (max-width: 767px) {
+  .signup-benefit,
+  .signup-card-back,
+  .signup-card-front,
+  .signup-modern-enter {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .signup-orb {
+    opacity: 0.5;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .signup-modern-enter,
+  .signup-benefit,
+  .signup-card-back,
+  .signup-card-front,
+  .signup-message {
+    animation: none !important;
+    opacity: 1;
+    transform: none;
+    transition: none !important;
+  }
+}
