@@ -6,9 +6,14 @@ import {
   Alert,
   getAlerts,
   createAlert,
+  updateAlert,
   deleteAlert,
 } from "../services/alertService";
 import { getStocks, Stock } from "../../stocks/services/stockService";
+
+function getCurrency(symbol: string) {
+  return symbol.endsWith(".NS") || symbol.endsWith(".BO") ? "₹" : "$";
+}
 
 export default function AlertPanel() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
@@ -20,6 +25,11 @@ export default function AlertPanel() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [notification, setNotification] = useState("");
+
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editCondition, setEditCondition] = useState<"above" | "below">("above");
+  const [editPrice, setEditPrice] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const knownAlertStatuses = useRef<Map<number, string>>(new Map());
   const isFirstLoad = useRef(true);
@@ -33,29 +43,25 @@ export default function AlertPanel() {
 
       setStocks(stockData);
 
-      if (stockData.length > 0 && !stockId) {
-        setStockId(String(stockData[0].id));
-      }
+      setStockId((current) =>
+        current || (stockData.length ? String(stockData[0].id) : "")
+      );
 
       if (isFirstLoad.current) {
         alertData.forEach((alert) => {
           knownAlertStatuses.current.set(alert.id, alert.status);
         });
-
         isFirstLoad.current = false;
       } else {
         alertData.forEach((alert) => {
           const previousStatus = knownAlertStatuses.current.get(alert.id);
 
-          if (
-            previousStatus === "active" &&
-            alert.status === "triggered"
-          ) {
-            const symbol =
-              stockData.find((stock) => stock.id === alert.stock_id)
-                ?.symbol ?? `Stock #${alert.stock_id}`;
+          if (previousStatus === "active" && alert.status === "triggered") {
+            const stock = stockData.find((item) => item.id === alert.stock_id);
+            const symbol = stock?.symbol ?? `Stock #${alert.stock_id}`;
+            const currency = getCurrency(symbol);
 
-            const message = `${symbol} reached your $${Number(
+            const message = `${symbol} reached your ${currency}${Number(
               alert.target_price
             ).toFixed(2)} target.`;
 
@@ -66,9 +72,7 @@ export default function AlertPanel() {
               "Notification" in window &&
               Notification.permission === "granted"
             ) {
-              new Notification("Stockly Price Alert", {
-                body: message,
-              });
+              new Notification("Stockly Price Alert", { body: message });
             }
           }
 
@@ -79,24 +83,22 @@ export default function AlertPanel() {
       setAlerts(alertData);
       setError("");
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to load alerts"
-      );
+      setError(err instanceof Error ? err.message : "Failed to load alerts");
     }
   }
 
   useEffect(() => {
-    loadData();
+    void loadData();
 
     const interval = window.setInterval(() => {
-      loadData();
+      void loadData();
     }, 10000);
 
     return () => window.clearInterval(interval);
   }, []);
 
   async function requestNotificationPermission() {
-    if (!("Notification" in window)) {
+    if (typeof window === "undefined" || !("Notification" in window)) {
       setError("Browser notifications are not supported.");
       return;
     }
@@ -136,11 +138,48 @@ export default function AlertPanel() {
       setTargetPrice("");
       setSuccess("Price alert created successfully.");
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to create alert"
-      );
+      setError(err instanceof Error ? err.message : "Failed to create alert");
     } finally {
       setLoading(false);
+    }
+  }
+
+  function startEditing(alert: Alert) {
+    setEditingId(alert.id);
+    setEditCondition(alert.condition);
+    setEditPrice(String(alert.target_price));
+    setError("");
+    setSuccess("");
+  }
+
+  async function handleUpdateAlert(alertId: number) {
+    const price = Number(editPrice);
+
+    if (!Number.isFinite(price) || price <= 0) {
+      setError("Please enter a valid target price.");
+      return;
+    }
+
+    try {
+      setSavingEdit(true);
+      setError("");
+
+      const updated = await updateAlert(alertId, {
+        condition: editCondition,
+        target_price: price,
+      });
+
+      setAlerts((current) =>
+        current.map((alert) => alert.id === alertId ? updated : alert)
+      );
+
+      knownAlertStatuses.current.set(updated.id, updated.status);
+      setEditingId(null);
+      setSuccess("Alert updated successfully.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update alert");
+    } finally {
+      setSavingEdit(false);
     }
   }
 
@@ -150,24 +189,23 @@ export default function AlertPanel() {
 
     try {
       await deleteAlert(alertId);
-
       knownAlertStatuses.current.delete(alertId);
-
-      setAlerts((current) =>
-        current.filter((alert) => alert.id !== alertId)
-      );
-
+      setAlerts((current) => current.filter((alert) => alert.id !== alertId));
       setSuccess("Alert deleted successfully.");
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to delete alert"
-      );
+      setError(err instanceof Error ? err.message : "Failed to delete alert");
     }
   }
 
   function getStockSymbol(id: number) {
     return stocks.find((stock) => stock.id === id)?.symbol ?? `Stock #${id}`;
   }
+
+  const selectedSymbol = stocks.find(
+    (stock) => String(stock.id) === stockId
+  )?.symbol ?? "";
+
+  const selectedCurrency = getCurrency(selectedSymbol);
 
   return (
     <section className="rounded-xl border border-white/10 bg-[#111827] p-5">
@@ -179,7 +217,7 @@ export default function AlertPanel() {
           </p>
         </div>
 
-        {"Notification" in window && (
+        {typeof window !== "undefined" && "Notification" in window && (
           <button
             onClick={requestNotificationPermission}
             className="rounded-lg border border-white/10 px-3 py-2 text-xs text-gray-300 transition hover:bg-white/5"
@@ -213,6 +251,7 @@ export default function AlertPanel() {
             onChange={(e) => setStockId(e.target.value)}
             className="w-full rounded-lg border border-white/10 bg-[#0B1220] px-3 py-2.5 text-sm text-white outline-none focus:border-emerald-500"
           >
+            {stocks.length === 0 && <option value="">No stocks available</option>}
             {stocks.map((stock) => (
               <option key={stock.id} value={stock.id}>
                 {stock.symbol} — {stock.company_name}
@@ -222,14 +261,10 @@ export default function AlertPanel() {
         </div>
 
         <div>
-          <label className="mb-2 block text-sm text-gray-400">
-            Condition
-          </label>
+          <label className="mb-2 block text-sm text-gray-400">Condition</label>
           <select
             value={condition}
-            onChange={(e) =>
-              setCondition(e.target.value as "above" | "below")
-            }
+            onChange={(e) => setCondition(e.target.value as "above" | "below")}
             className="w-full rounded-lg border border-white/10 bg-[#0B1220] px-3 py-2.5 text-sm text-white outline-none focus:border-emerald-500"
           >
             <option value="above">Price goes above</option>
@@ -239,7 +274,7 @@ export default function AlertPanel() {
 
         <div className="sm:col-span-2">
           <label className="mb-2 block text-sm text-gray-400">
-            Target Price ($)
+            Target Price ({selectedCurrency})
           </label>
           <input
             type="number"
@@ -267,9 +302,7 @@ export default function AlertPanel() {
       <div className="mt-6 border-t border-white/10 pt-5">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="font-medium text-white">Your Alerts</h3>
-          <span className="text-xs text-gray-400">
-            {alerts.length} total
-          </span>
+          <span className="text-xs text-gray-400">{alerts.length} total</span>
         </div>
 
         {alerts.length === 0 ? (
@@ -278,47 +311,99 @@ export default function AlertPanel() {
           </p>
         ) : (
           <div className="space-y-3">
-            {alerts.map((alert) => (
-              <div
-                key={alert.id}
-                className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-[#0B1220] p-3"
-              >
-                <div>
-                  <p className="font-medium text-white">
-                    {getStockSymbol(alert.stock_id)}
-                  </p>
+            {alerts.map((alert) => {
+              const currency = getCurrency(getStockSymbol(alert.stock_id));
 
-                  <p className="mt-1 text-sm text-gray-400">
-                    Price {alert.condition} $
-                    {Number(alert.target_price).toFixed(2)}
-                  </p>
+              return (
+                <div
+                  key={alert.id}
+                  className="rounded-lg border border-white/10 bg-[#0B1220] p-3"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-white">
+                        {getStockSymbol(alert.stock_id)}
+                      </p>
+                      <p className="mt-1 text-sm text-gray-400">
+                        Price {alert.condition} {currency}
+                        {Number(alert.target_price).toFixed(2)}
+                      </p>
+                      <p
+                        className={`mt-1 text-xs capitalize ${
+                          alert.status === "triggered"
+                            ? "text-emerald-400"
+                            : "text-gray-400"
+                        }`}
+                      >
+                        {alert.status}
+                      </p>
+                      {alert.triggered_at && (
+                        <p className="mt-1 text-xs text-gray-500">
+                          Triggered: {new Date(alert.triggered_at).toLocaleString()}
+                        </p>
+                      )}
+                    </div>
 
-                  <p
-                    className={`mt-1 text-xs capitalize ${
-                      alert.status === "triggered"
-                        ? "text-emerald-400"
-                        : "text-gray-400"
-                    }`}
-                  >
-                    {alert.status}
-                  </p>
+                    <div className="flex flex-wrap gap-2">
+                      {alert.status === "active" && (
+                        <button
+                          onClick={() => startEditing(alert)}
+                          className="rounded-md border border-white/10 px-3 py-1.5 text-xs text-gray-300 transition hover:bg-white/5"
+                        >
+                          Edit
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleDeleteAlert(alert.id)}
+                        className="rounded-md border border-red-500/20 px-3 py-1.5 text-xs text-red-400 transition hover:bg-red-500/10"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
 
-                  {alert.triggered_at && (
-                    <p className="mt-1 text-xs text-gray-500">
-                      Triggered:{" "}
-                      {new Date(alert.triggered_at).toLocaleString()}
-                    </p>
+                  {editingId === alert.id && (
+                    <div className="mt-4 grid gap-3 border-t border-white/10 pt-4 sm:grid-cols-2">
+                      <select
+                        value={editCondition}
+                        onChange={(e) =>
+                          setEditCondition(e.target.value as "above" | "below")
+                        }
+                        className="rounded-lg border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white"
+                      >
+                        <option value="above">Price goes above</option>
+                        <option value="below">Price goes below</option>
+                      </select>
+
+                      <input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        value={editPrice}
+                        onChange={(e) => setEditPrice(e.target.value)}
+                        className="rounded-lg border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white"
+                      />
+
+                      <div className="flex gap-2 sm:col-span-2">
+                        <button
+                          onClick={() => handleUpdateAlert(alert.id)}
+                          disabled={savingEdit}
+                          className="rounded-lg bg-emerald-500 px-3 py-2 text-xs font-medium text-black disabled:opacity-50"
+                        >
+                          {savingEdit ? "Saving..." : "Save Changes"}
+                        </button>
+                        <button
+                          onClick={() => setEditingId(null)}
+                          className="rounded-lg border border-white/10 px-3 py-2 text-xs text-gray-300"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
-
-                <button
-                  onClick={() => handleDeleteAlert(alert.id)}
-                  className="rounded-md border border-red-500/20 px-3 py-1.5 text-xs text-red-400 transition hover:bg-red-500/10"
-                >
-                  Delete
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

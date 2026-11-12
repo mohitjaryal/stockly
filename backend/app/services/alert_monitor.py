@@ -1,7 +1,7 @@
 
 import logging
 from datetime import datetime, timezone
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from app.db.session import SessionLocal
 from app.models import Alert, Stock
@@ -27,25 +27,45 @@ def check_active_alerts():
         for alert in alerts:
             symbol = alert.stock.symbol
 
-            # Fetch one quote per stock, even if multiple alerts exist.
+            # Fetch only one quote per stock.
             if symbol not in quotes:
                 try:
                     quote = get_stock_quote(symbol)
-                    current_price = quote.get("c")
 
-                    if current_price is None or current_price <= 0:
-                        quotes[symbol] = None
-                    else:
-                        quotes[symbol] = Decimal(str(current_price))
+                    if not isinstance(quote, dict):
+                        raise ValueError("Invalid quote response")
 
-                except Exception:
-                    logger.exception(
-                        "Failed to fetch quote for %s", symbol
+                    raw_price = quote.get("c")
+
+                    if raw_price is None:
+                        raise ValueError("Quote does not contain current price")
+
+                    current_price = Decimal(str(raw_price))
+
+                    if not current_price.is_finite() or current_price <= 0:
+                        raise ValueError("Invalid or non-positive stock price")
+
+                    quotes[symbol] = current_price
+
+                except (InvalidOperation, ValueError) as exc:
+                    logger.warning(
+                        "Skipping alerts for %s: %s",
+                        symbol,
+                        exc,
+                    )
+                    quotes[symbol] = None
+
+                except Exception as exc:
+                    logger.warning(
+                        "Quote fetch failed for %s: %s",
+                        symbol,
+                        exc,
                     )
                     quotes[symbol] = None
 
             current_price = quotes[symbol]
 
+            # Skip this stock if its quote could not be fetched.
             if current_price is None:
                 continue
 
@@ -66,7 +86,10 @@ def check_active_alerts():
 
         if triggered_count:
             db.commit()
-            logger.info("Triggered %s price alerts", triggered_count)
+            logger.info(
+                "Successfully triggered %s price alerts",
+                triggered_count,
+            )
 
         return triggered_count
 

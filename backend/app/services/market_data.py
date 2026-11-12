@@ -1,5 +1,6 @@
 
 import os
+
 import httpx
 import yfinance as yf
 from dotenv import load_dotenv
@@ -9,6 +10,14 @@ load_dotenv()
 FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY")
 BASE_URL = "https://finnhub.io/api/v1"
 
+# Separate timeout limits for different network operations.
+FINNHUB_TIMEOUT = httpx.Timeout(
+    connect=5.0,
+    read=8.0,
+    write=5.0,
+    pool=5.0,
+)
+
 
 def get_finnhub_headers():
     if not FINNHUB_API_KEY:
@@ -17,7 +26,7 @@ def get_finnhub_headers():
     return {"X-Finnhub-Token": FINNHUB_API_KEY}
 
 
-# Search stocks by company name or ticker
+# Search stocks by company name or ticker.
 def search_stock_symbols(query: str, exchange: str | None = None):
     query = query.strip()
 
@@ -33,7 +42,7 @@ def search_stock_symbols(query: str, exchange: str | None = None):
         f"{BASE_URL}/search",
         params=params,
         headers=get_finnhub_headers(),
-        timeout=10,
+        timeout=FINNHUB_TIMEOUT,
     )
 
     response.raise_for_status()
@@ -41,12 +50,11 @@ def search_stock_symbols(query: str, exchange: str | None = None):
     return response.json()
 
 
-# Get Latest Stock Quote from Finnhub
-
+# Get latest stock quote.
 def get_stock_quote(symbol: str):
     symbol = symbol.strip().upper()
 
-    # Indian stocks: use Yahoo Finance
+    # Indian stocks: use Yahoo Finance.
     if symbol.endswith(".NS") or symbol.endswith(".BO"):
         ticker = yf.Ticker(symbol)
 
@@ -54,6 +62,7 @@ def get_stock_quote(symbol: str):
             period="5d",
             interval="1d",
             auto_adjust=False,
+            timeout=10,
         )
 
         if history.empty:
@@ -61,7 +70,7 @@ def get_stock_quote(symbol: str):
                 f"No quote data available for Indian stock: {symbol}"
             )
 
-        # Latest available trading session
+        # Latest available trading session.
         row = history.iloc[-1]
         timestamp = history.index[-1]
 
@@ -73,15 +82,16 @@ def get_stock_quote(symbol: str):
             "t": int(timestamp.timestamp()),
         }
 
-    # US and other supported stocks: use Finnhub
+    # US and other supported stocks: use Finnhub.
     response = httpx.get(
         f"{BASE_URL}/quote",
         params={"symbol": symbol},
         headers=get_finnhub_headers(),
-        timeout=10,
+        timeout=FINNHUB_TIMEOUT,
     )
 
     response.raise_for_status()
+
     quote = response.json()
 
     if not isinstance(quote, dict):
@@ -90,9 +100,7 @@ def get_stock_quote(symbol: str):
     return quote
 
 
-
-
-# Get Historical Stock Candles from Yahoo Finance
+# Get historical stock candles from Yahoo Finance.
 def get_stock_candles(
     symbol: str,
     resolution: str = "D",
@@ -120,6 +128,7 @@ def get_stock_candles(
         period=period,
         interval=interval,
         auto_adjust=False,
+        timeout=10,
     )
 
     if history.empty:
