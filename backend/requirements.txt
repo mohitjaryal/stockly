@@ -1,13 +1,1 @@
-
-fastapi
-uvicorn[standard]
-sqlalchemy
-psycopg[binary]
-pydantic-settings
-python-dotenv
-alembic
-pytest
-httpx
-apscheduler>=3.10,<4
-PyJWT
-pwdlib[argon2]
+yfinance
