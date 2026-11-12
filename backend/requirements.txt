@@ -12,3 +12,4 @@ apscheduler>=3.10,<4
 PyJWT
 pwdlib[argon2]
 yfinance
+email-validator
