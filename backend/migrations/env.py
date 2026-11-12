@@ -1,7 +1,7 @@
 
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config, pool, URL
+from sqlalchemy import URL, engine_from_config, pool
 from alembic import context
 
 from app.db.base import Base
@@ -17,14 +17,24 @@ target_metadata = Base.metadata
 
 
 def get_database_url():
+    if Settings.DATABASE_URL:
+        url = Settings.DATABASE_URL
+
+        if url.startswith("postgres://"):
+            url = url.replace("postgres://", "postgresql+psycopg://", 1)
+        elif url.startswith("postgresql://"):
+            url = url.replace("postgresql://", "postgresql+psycopg://", 1)
+
+        return url
+
     return URL.create(
         drivername="postgresql+psycopg",
         username=Settings.DB_USER,
         password=Settings.DB_PASSWORD,
         host=Settings.DB_HOST,
-        port=int(Settings.DB_PORT),
+        port=Settings.DB_PORT,
         database=Settings.DB_NAME,
-    )
+    ).render_as_string(hide_password=False)
 
 
 def run_migrations_offline() -> None:
@@ -41,11 +51,7 @@ def run_migrations_offline() -> None:
 
 def run_migrations_online() -> None:
     connectable = engine_from_config(
-        {
-            "sqlalchemy.url": get_database_url().render_as_string(
-                hide_password=False
-            )
-        },
+        {"sqlalchemy.url": get_database_url()},
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
