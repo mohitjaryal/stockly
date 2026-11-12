@@ -44,7 +44,7 @@ export default function LoginPage() {
     try {
       const data = await login(email, password);
       localStorage.setItem("stockly_token", data.access_token);
-      router.push("/");
+      router.push("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed. Please try again.");
     } finally {
@@ -53,21 +53,21 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="login-page min-h-[100svh] bg-[#080d16] text-white">
+    <main className="login-page min-h-svh bg-[#080d16] text-white">
       <div className="login-grid-bg pointer-events-none fixed inset-0 opacity-40" />
 
-      <div className="relative mx-auto grid min-h-[100svh] w-full max-w-[1600px] lg:grid-cols-[1.05fr_0.95fr]">
+      <div className="relative mx-auto grid min-h-svh w-full max-w-[1600px] lg:grid-cols-[1.05fr_0.95fr]">
 
         {/* Desktop market showcase */}
         <section className="relative hidden flex-col justify-between overflow-hidden border-r border-white/[0.07] px-10 py-8 lg:flex xl:px-16">
-          <div className="pointer-events-none absolute -left-40 top-28 h-96 w-96 rounded-full bg-emerald-400/[0.08] blur-[110px]" />
-          <div className="pointer-events-none absolute -bottom-40 right-0 h-96 w-96 rounded-full bg-blue-500/[0.08] blur-[120px]" />
+          <div className="pointer-events-none absolute -left-40 top-28 h-96 w-96 rounded-full bg-emerald-400/8 blur-[110px]" />
+          <div className="pointer-events-none absolute -bottom-40 right-0 h-96 w-96 rounded-full bg-blue-500/8 blur-[120px]" />
 
           <div className="relative z-10">
             <Logo />
           </div>
 
-          <div className="relative z-10 my-8 max-w-[620px] login-enter">
+          <div className="relative z-10 my-8 max-w-155 login-enter">
             <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/[0.07] px-3.5 py-2 text-xs font-medium text-emerald-300">
               <span className="h-2 w-2 rounded-full bg-emerald-400" />
               One view. Smarter investing.
@@ -78,7 +78,7 @@ export default function LoginPage() {
               <br />
               market move
               <br />
-              <span className="bg-gradient-to-r from-emerald-300 to-teal-200 bg-clip-text text-transparent">
+              <span className="bg-linear-to-r from-emerald-300 to-teal-200 bg-clip-text text-transparent">
                 count.
               </span>
             </h1>
@@ -88,19 +88,19 @@ export default function LoginPage() {
               beautifully clear investing workspace.
             </p>
 
-            <div className="login-float mt-8 max-w-[560px] rounded-2xl border border-white/10 bg-[#101a27]/90 p-5 shadow-2xl shadow-black/20 backdrop-blur-xl">
+            <div className="login-float mt-8 max-w-140 rounded-2xl border border-white/10 bg-[#101a27]/90 p-5 shadow-2xl shadow-black/20 backdrop-blur-xl">
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-[11px] font-medium tracking-wider text-slate-400">MARKET OVERVIEW</p>
                   <p className="mt-2 text-lg font-semibold">Your markets, together</p>
                   <p className="mt-1 text-xs text-slate-500">India · United States</p>
                 </div>
-                <span className="rounded-lg border border-emerald-400/15 bg-emerald-400/[0.08] px-2.5 py-1.5 text-[11px] text-emerald-300">
+                <span className="rounded-lg border border-emerald-400/15 bg-emerald-400/8 px-2.5 py-1.5 text-[11px] text-emerald-300">
                   NSE + NASDAQ
                 </span>
               </div>
 
-              <div className="relative mt-5 h-28 overflow-hidden rounded-xl bg-gradient-to-b from-emerald-400/[0.07] to-transparent">
+              <div className="relative mt-5 h-28 overflow-hidden rounded-xl bg-linear-to-b from-emerald-400/[0.07] to-transparent">
                 <div className="absolute inset-0 flex flex-col justify-between py-2">
                   <div className="border-t border-dashed border-white/[0.07]" />
                   <div className="border-t border-dashed border-white/[0.07]" />
@@ -150,10 +150,10 @@ export default function LoginPage() {
             <p className="mb-3 text-[10px] font-semibold tracking-[0.2em] text-slate-500">
               EXPLORE THE MARKETS
             </p>
-            <div className="overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.025]">
+            <div className="overflow-hidden rounded-xl border border-white/8 bg-white/2.5">
               <div className="login-ticker-track flex w-max">
                 {[...stocks, ...stocks].map((stock, index) => (
-                  <div key={`${stock.symbol}-${index}`} className="flex min-w-[175px] items-center gap-3 border-r border-white/[0.07] px-4 py-3">
+                  <div key={`${stock.symbol}-${index}`} className="flex min-w-43.75 items-center gap-3 border-r border-white/[0.07] px-4 py-3">
                     <div>
                       <p className="text-xs font-semibold text-slate-200">{stock.symbol}</p>
                       <p className="mt-0.5 text-[10px] text-slate-500">{stock.exchange}</p>
@@ -175,7 +175,7 @@ export default function LoginPage() {
         </section>
 
         {/* Login panel */}
-        <section className="relative flex min-h-[100svh] flex-col px-5 py-4 sm:px-8 sm:py-6 lg:px-12 xl:px-20">
+        <section className="relative flex min-h-svh flex-col px-5 py-4 sm:px-8 sm:py-6 lg:px-12 xl:px-20">
           <header className="flex items-center justify-between gap-3">
             <div className="lg:hidden">
               <Logo />
@@ -189,9 +189,9 @@ export default function LoginPage() {
             </Link>
           </header>
 
-          <div className="mx-auto flex w-full max-w-[420px] flex-1 flex-col justify-center py-6 sm:py-10 lg:py-8">
+          <div className="mx-auto flex w-full max-w-105 flex-1 flex-col justify-center py-6 sm:py-10 lg:py-8">
             <div className="login-enter">
-              <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl border border-emerald-400/20 bg-emerald-400/[0.08] text-emerald-300">
+              <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl border border-emerald-400/20 bg-emerald-400/8 text-emerald-300">
                 <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
                   <path d="M4 18V6m0 12h16M7 14l4-4 3 3 6-7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
                   <path d="M16 6h4v4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
@@ -223,7 +223,7 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
-                  className="h-12 w-full rounded-xl border border-white/10 bg-[#101925] px-4 text-base text-white outline-none transition-colors placeholder:text-slate-600 hover:border-white/20 focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-400/[0.08]"
+                  className="h-12 w-full rounded-xl border border-white/10 bg-[#101925] px-4 text-base text-white outline-none transition-colors placeholder:text-slate-600 hover:border-white/20 focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-400/8"
                 />
               </div>
 
@@ -240,7 +240,7 @@ export default function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
-                    className="h-12 w-full rounded-xl border border-white/10 bg-[#101925] px-4 pr-16 text-base text-white outline-none transition-colors placeholder:text-slate-600 hover:border-white/20 focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-400/[0.08]"
+                    className="h-12 w-full rounded-xl border border-white/10 bg-[#101925] px-4 pr-16 text-base text-white outline-none transition-colors placeholder:text-slate-600 hover:border-white/20 focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-400/8"
                   />
                   <button
                     type="button"
@@ -255,7 +255,7 @@ export default function LoginPage() {
               </div>
 
               {error && (
-                <div role="alert" aria-live="polite" className="login-error rounded-xl border border-rose-400/20 bg-rose-400/[0.08] px-4 py-3 text-sm text-rose-300">
+                <div role="alert" aria-live="polite" className="login-error rounded-xl border border-rose-400/20 bg-rose-400/8 px-4 py-3 text-sm text-rose-300">
                   {error}
                 </div>
               )}
@@ -280,21 +280,21 @@ export default function LoginPage() {
             </form>
 
             <div className="my-6 flex items-center gap-3">
-              <div className="h-px flex-1 bg-white/[0.08]" />
+              <div className="h-px flex-1 bg-white/8" />
               <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-slate-600">
                 New to Stockly?
               </span>
-              <div className="h-px flex-1 bg-white/[0.08]" />
+              <div className="h-px flex-1 bg-white/8" />
             </div>
 
             <Link
               href="/signup"
-              className="flex min-h-12 w-full items-center justify-center rounded-xl border border-white/10 bg-white/[0.025] text-sm font-medium text-slate-200 transition-colors hover:border-emerald-400/30 hover:bg-emerald-400/[0.05] hover:text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
+              className="flex min-h-12 w-full items-center justify-center rounded-xl border border-white/10 bg-white/2.5 text-sm font-medium text-slate-200 transition-colors hover:border-emerald-400/30 hover:bg-emerald-400/5 hover:text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
             >
               Create your free account
             </Link>
 
-            <div className="mt-6 flex items-start gap-3 rounded-xl border border-white/[0.07] bg-white/[0.025] p-3.5">
+            <div className="mt-6 flex items-start gap-3 rounded-xl border border-white/[0.07] bg-white/2.5 p-3.5">
               <svg viewBox="0 0 24 24" fill="none" className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" aria-hidden="true">
                 <path d="M12 3 19 6v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
                 <path d="m9 12 2 2 4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
