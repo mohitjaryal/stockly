@@ -1,9 +1,20 @@
 
 "use client";
 
+import { useRouter } from "next/navigation";
 import WatchlistPanel from "@/features/watchlist/components/WatchlistPanel";
 
 export default function WatchlistPage() {
+  const router = useRouter();
+
+  function handleSelectStock(stock: {
+    symbol: string;
+    company_name: string;
+    exchange: string;
+  }) {
+    router.push(`/stocks?symbol=${encodeURIComponent(stock.symbol)}`);
+  }
+
   return (
     <div className="space-y-8">
       <section>
@@ -21,7 +32,7 @@ export default function WatchlistPage() {
       </section>
 
       <div className="max-w-4xl">
-        <WatchlistPanel onSelect={() => {}} />
+        <WatchlistPanel onSelect={handleSelectStock} />
       </div>
     </div>
   );

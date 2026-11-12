@@ -7,10 +7,18 @@ from datetime import datetime, timezone
 import httpx
 
 from app.db.session import SessionLocal
-from app.models import User, Stock, StockPrice, HistoricalCandle
+from app.models import (
+    User,
+    Stock,
+    StockListing,
+    StockPrice,
+    HistoricalCandle,
+)
 from app.schemas.stock import StockCreate, StockResponse
 from app.schemas.stock_price import StockPriceResponse
+from app.schemas.stock_listing import StockListingResponse
 from app.core.security import require_admin, get_current_user
+from app.services.stock_directory.importer import sync_stock_directory
 from app.services.market_data import (
     get_stock_quote,
     get_stock_candles,
@@ -26,6 +34,31 @@ def get_db():
         yield db
     finally:
         db.close()
+
+# POST - Sync Stock Directory (Admin Only)
+@router.post("/directory/sync")
+def sync_directory(
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+):
+    try:
+        summary = sync_stock_directory(
+            db=db,
+            include_india=True,
+            include_us=True,
+        )
+
+        return {
+            "message": "Stock directory synchronization completed",
+            "status": "success",
+            "summary": summary,
+        }
+
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=str(exc),
+        ) from exc
 
 
 # POST - Create Stock (Admin Only)
@@ -51,9 +84,11 @@ def create_stock(
             detail="Stock symbol or company name exceeds allowed length",
         )
 
-    existing_stock = db.query(Stock).filter(
-        Stock.symbol == symbol
-    ).first()
+    existing_stock = (
+        db.query(Stock)
+        .filter(Stock.symbol == symbol)
+        .first()
+    )
 
     if existing_stock:
         raise HTTPException(
@@ -116,9 +151,11 @@ def add_stock(
             detail="Exchange cannot exceed 50 characters",
         )
 
-    existing_stock = db.query(Stock).filter(
-        Stock.symbol == symbol
-    ).first()
+    existing_stock = (
+        db.query(Stock)
+        .filter(Stock.symbol == symbol)
+        .first()
+    )
 
     if existing_stock:
         raise HTTPException(
@@ -146,7 +183,7 @@ def add_stock(
     return stock
 
 
-# GET - All Stocks
+# GET - All Tracked Stocks
 @router.get("/", response_model=list[StockResponse])
 def list_stocks(
     db: Session = Depends(get_db),
@@ -158,8 +195,100 @@ def list_stocks(
     )
 
 
-# GET - Search Stocks
-# Keep this route before /{symbol}
+# GET - Stock Directory
+@router.get(
+    "/directory",
+    response_model=list[StockListingResponse],
+)
+def get_stock_directory(
+    country: str | None = Query(default=None, min_length=2, max_length=2),
+    exchange: str | None = Query(default=None, max_length=30),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+):
+    query = db.query(StockListing).filter(
+        StockListing.is_active.is_(True),
+        StockListing.asset_type == "EQUITY",
+    )
+
+    if country:
+        query = query.filter(
+            StockListing.country == country.strip().upper()
+        )
+
+    if exchange:
+        query = query.filter(
+            StockListing.exchange.ilike(exchange.strip())
+        )
+
+    return (
+        query
+        .order_by(StockListing.company_name.asc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+
+
+# GET - Search Stock Directory
+@router.get(
+    "/directory/search",
+    response_model=list[StockListingResponse],
+)
+def search_stock_directory(
+    q: str = Query(..., min_length=1, max_length=100),
+    country: str | None = Query(default=None, min_length=2, max_length=2),
+    exchange: str | None = Query(default=None, max_length=30),
+    sector: str | None = Query(default=None, max_length=100),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+):
+    search_term = q.strip()
+
+    if not search_term:
+        raise HTTPException(
+            status_code=400,
+            detail="Search query cannot be empty",
+        )
+
+    search_pattern = f"%{search_term}%"
+
+    query = db.query(StockListing).filter(
+        StockListing.is_active.is_(True),
+        StockListing.asset_type == "EQUITY",
+        (
+            StockListing.symbol.ilike(search_pattern)
+            | StockListing.company_name.ilike(search_pattern)
+        ),
+    )
+
+    if country:
+        query = query.filter(
+            StockListing.country == country.strip().upper()
+        )
+
+    if exchange:
+        query = query.filter(
+            StockListing.exchange.ilike(exchange.strip())
+        )
+
+    if sector:
+        query = query.filter(
+            StockListing.sector.ilike(f"%{sector.strip()}%")
+        )
+
+    return (
+        query
+        .order_by(StockListing.company_name.asc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+
+
+# GET - Search Stocks (External Provider)
 @router.get("/search")
 def search_stocks(
     q: str = Query(..., min_length=1, max_length=100),
@@ -243,7 +372,6 @@ def get_latest_stock_price(
             detail="Stock not found",
         )
 
-    # Fetch quote from the appropriate provider
     try:
         quote = get_stock_quote(stock.symbol)
 
