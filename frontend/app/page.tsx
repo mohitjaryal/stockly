@@ -260,15 +260,15 @@ export default function Home() {
       </header>
 
       {/* HERO */}
-      <section className="relative px-5 pb-20 pt-16 sm:px-8 sm:pt-24 lg:px-10 lg:pb-28 lg:pt-28">
+      <section className="relative px-5 pb-10 pt-8 sm:px-8 sm:pt-12 sm:pb-12 lg:px-10 lg:pt-14 lg:pb-14">
         <div className="pointer-events-none absolute -left-48 top-0 h-[450px] w-[450px] rounded-full bg-emerald-500/[0.10] blur-[130px]" />
         <div className="pointer-events-none absolute -right-40 top-20 h-[450px] w-[450px] rounded-full bg-blue-500/[0.07] blur-[140px]" />
 
-        <div className="relative mx-auto grid max-w-7xl items-center gap-14 lg:grid-cols-[0.95fr_1.05fr] lg:gap-12">
+        <div className="relative mx-auto grid max-w-7xl items-center gap-8 lg:grid-cols-[0.95fr_1.05fr] lg:gap-10">
           <div className="stockly-hero-content">
             <SectionLabel>YOUR INVESTMENT WORKSPACE</SectionLabel>
 
-            <h1 className="max-w-2xl text-[43px] font-extrabold leading-[1.1] tracking-[-0.055em] sm:text-6xl lg:text-[68px]">
+            <h1 className="max-w-2xl text-[38px] font-extrabold leading-[1.08] tracking-[-0.055em] sm:text-5xl lg:text-[60px]">
               Your investments.
               <br />
               <span className="bg-gradient-to-r from-emerald-300 via-emerald-400 to-teal-300 bg-clip-text text-transparent">
@@ -276,13 +276,13 @@ export default function Home() {
               </span>
             </h1>
 
-            <p className="mt-6 max-w-xl text-[15px] leading-7 text-slate-400 sm:mt-7 sm:text-lg sm:leading-8">
+            <p className="mt-4 max-w-xl text-[15px] leading-6 text-slate-400 sm:mt-5 sm:text-lg sm:leading-7">
               Everything you need to organise your investment journey. Track
               your portfolio, discover stocks, follow the market and stay
               informed — all from one place.
             </p>
 
-            <div className="mt-8 flex flex-col gap-3 min-[420px]:flex-row sm:mt-9">
+            <div className="mt-6 flex flex-col gap-3 min-[420px]:flex-row sm:mt-6">
               <Link
                 href="/signup"
                 className="inline-flex min-h-[52px] items-center justify-center rounded-xl bg-emerald-500 px-6 py-4 text-center text-sm font-bold text-[#06110d] shadow-xl shadow-emerald-500/20 transition duration-300 hover:-translate-y-1 hover:bg-emerald-400"
@@ -299,7 +299,7 @@ export default function Home() {
             </div>
 
             {/* ORIGINAL SOCIAL PROOF */}
-            <div className="mt-10 flex items-center gap-3 sm:mt-12">
+            <div className="mt-6 flex items-center gap-3 sm:mt-6">
               <div className="flex -space-x-2.5">
                 <div className="flex h-9 w-9 items-center justify-center rounded-full border-[3px] border-[#080d16] bg-emerald-400 text-xs font-extrabold text-[#07120f]">
                   S
