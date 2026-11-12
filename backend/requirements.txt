@@ -10,3 +10,4 @@ pytest
 httpx
 apscheduler>=3.10,<4
 PyJWT
+pwdlib[argon2]
