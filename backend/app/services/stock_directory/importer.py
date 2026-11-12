@@ -40,15 +40,24 @@ US_EXCHANGE_CODES = {
 
 def download_file(url: str) -> str:
     headers = {
-        "User-Agent": "Stockly Stock Directory/1.0",
-        "Accept": "text/csv,text/plain,*/*",
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/131.0.0.0 Safari/537.36"
+        ),
+        "Accept": "text/csv,text/plain,application/json,*/*",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referer": "https://www.nseindia.com/",
+        "Origin": "https://www.nseindia.com",
     }
 
     try:
         with httpx.Client(
-            timeout=httpx.Timeout(30.0, connect=10.0),
+            timeout=httpx.Timeout(60.0, connect=20.0),
             follow_redirects=True,
             headers=headers,
+            http1=True,
+            http2=False,
         ) as client:
             response = client.get(url)
             response.raise_for_status()
@@ -60,7 +69,7 @@ def download_file(url: str) -> str:
 
         return content
 
-    except httpx.HTTPError as exc:
+    except (httpx.HTTPError, ValueError) as exc:
         logger.exception("Failed to download source: %s", url)
         raise RuntimeError(
             f"Could not download stock listing source: {url}"
@@ -275,38 +284,40 @@ def upsert_listings(
 
 
 def sync_stock_directory(
-    db: Session,
-    include_india: bool = True,
-    include_us: bool = True,
-) -> dict[str, Any]:
-
+    db,
+    include_india=True,
+    include_us=True,
+) -> dict:
     summary = {
         "india_processed": 0,
         "nasdaq_processed": 0,
         "other_us_processed": 0,
         "total_processed": 0,
         "unknown_us_exchange_codes": [],
+        "errors": [],
     }
 
-    try:
-        if include_india:
+    if include_india:
+        try:
             nse_content = download_file(NSE_EQUITY_URL)
             nse_records = parse_nse_listings(nse_content)
+            summary["india_processed"] = upsert_listings(db, nse_records)
+        except Exception as exc:
+            db.rollback()
+            logger.exception("NSE stock import failed")
+            summary["errors"].append(f"NSE import failed: {exc}")
 
-            summary["india_processed"] = upsert_listings(
-                db,
-                nse_records,
-            )
-
-        if include_us:
+    if include_us:
+        try:
             nasdaq_content = download_file(NASDAQ_LISTED_URL)
             nasdaq_records = parse_nasdaq_listings(nasdaq_content)
+            summary["nasdaq_processed"] = upsert_listings(db, nasdaq_records)
+        except Exception as exc:
+            db.rollback()
+            logger.exception("NASDAQ stock import failed")
+            summary["errors"].append(f"NASDAQ import failed: {exc}")
 
-            summary["nasdaq_processed"] = upsert_listings(
-                db,
-                nasdaq_records,
-            )
-
+        try:
             other_content = download_file(OTHER_LISTED_URL)
 
             other_reader = csv.DictReader(
@@ -316,33 +327,29 @@ def sync_stock_directory(
             normalize_headers(other_reader)
 
             unknown_codes = set()
-
             for row in other_reader:
                 code = (row.get("Exchange") or "").strip().upper()
-
                 if code and code not in US_EXCHANGE_CODES:
                     unknown_codes.add(code)
 
-            summary["unknown_us_exchange_codes"] = sorted(
-                unknown_codes
-            )
+            summary["unknown_us_exchange_codes"] = sorted(unknown_codes)
 
             other_records = parse_other_us_listings(other_content)
+            summary["other_us_processed"] = upsert_listings(db, other_records)
 
-            summary["other_us_processed"] = upsert_listings(
-                db,
-                other_records,
-            )
+        except Exception as exc:
+            db.rollback()
+            logger.exception("Other US stock import failed")
+            summary["errors"].append(f"Other US import failed: {exc}")
 
-        summary["total_processed"] = (
-            summary["india_processed"]
-            + summary["nasdaq_processed"]
-            + summary["other_us_processed"]
-        )
+    summary["total_processed"] = (
+        summary["india_processed"]
+        + summary["nasdaq_processed"]
+        + summary["other_us_processed"]
+    )
 
-        return summary
+    if summary["total_processed"] == 0 and summary["errors"]:
+        raise RuntimeError("; ".join(summary["errors"]))
 
-    except Exception:
-        db.rollback()
-        logger.exception("Stock directory synchronization failed")
-        raise
+    return summary
+
