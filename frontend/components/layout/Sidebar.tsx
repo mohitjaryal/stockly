@@ -21,8 +21,11 @@ const sections = [
       { label: "Portfolio", href: "/portfolio", icon: "▤" },
       { label: "Risk Monitor", href: "/portfolio-risk", icon: "◉" },
       { label: "Investment Goals", href: "/investment-goals", icon: "◎" },
+      { label: "Budget Planner", href: "/budget-planner", icon: "₹" },
       { label: "Stocks", href: "/stocks", icon: "↗" },
       { label: "Mutual Funds", href: "/mutual-funds", icon: "◈" },
+      { label: "Investment Planner", href: "/investment-planner", icon: "📈" },
+      { label: "Financial Reports", href: "/financial-reports", icon: "📊" },
     ],
   },
   {

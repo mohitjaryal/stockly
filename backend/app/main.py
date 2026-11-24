@@ -15,6 +15,8 @@ from app.api.portfolio import router as portfolio_router
 from app.api.portfolio_risk import router as portfolio_risk_router
 from app.api.investment_goals import router as investment_goals_router
 from app.api.investment_goal_contributions import router as investment_goal_contributions_router
+from app.api.investment_budgets import router as investment_budgets_router
+from app.api.investment_plans import router as investment_plans_router
 
 
 scheduler = BackgroundScheduler(timezone="UTC")
@@ -69,6 +71,8 @@ app.include_router(portfolio_router)
 app.include_router(investment_goals_router)
 app.include_router(portfolio_risk_router)
 app.include_router(investment_goal_contributions_router)
+app.include_router(investment_budgets_router)
+app.include_router(investment_plans_router)
 
 
 @app.get("/")
