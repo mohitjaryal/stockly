@@ -64,33 +64,29 @@ export default function DashboardPage() {
     },
     {
       label: "Watchlist",
-      value: isLoadingStats
-        ? "..."
-        : watchlistCount?.toString() ?? "—",
+      value: isLoadingStats ? "..." : watchlistCount?.toString() ?? "—",
       detail: "Tracked stocks",
     },
     {
       label: "Price alerts",
-      value: isLoadingStats
-        ? "..."
-        : activeAlertsCount?.toString() ?? "—",
+      value: isLoadingStats ? "..." : activeAlertsCount?.toString() ?? "—",
       detail: "Active alerts",
     },
   ];
 
   return (
-    <div className="space-y-8">
-      <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
+    <div className="w-full min-w-0 space-y-6 sm:space-y-8">
+      <section className="flex min-w-0 flex-col justify-between gap-3 sm:flex-row sm:items-end sm:gap-4">
+        <div className="min-w-0">
+          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-500 sm:text-xs sm:tracking-[0.16em]">
             Workspace / Overview
           </p>
 
-          <h1 className="mt-3 text-2xl font-semibold tracking-tight text-white">
+          <h1 className="mt-2 text-xl font-semibold tracking-tight text-white sm:mt-3 sm:text-2xl">
             Market overview
           </h1>
 
-          <p className="mt-2 text-sm text-slate-400">
+          <p className="mt-2 max-w-xl text-sm leading-6 text-slate-400">
             Monitor your stocks and market activity in one place.
           </p>
         </div>
@@ -100,15 +96,15 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <section className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
         {marketStats.map((stat) => (
           <div
             key={stat.label}
-            className="rounded-lg border border-white/8 bg-[#111722] p-5"
+            className="min-w-0 rounded-lg border border-white/8 bg-[#111722] p-4 sm:p-5"
           >
             <p className="text-xs text-slate-400">{stat.label}</p>
 
-            <p className="mt-4 text-2xl font-semibold tracking-tight text-white">
+            <p className="mt-3 wrap-break-word text-2xl font-semibold tracking-tight text-white sm:mt-4">
               {stat.value}
             </p>
 
@@ -117,23 +113,27 @@ export default function DashboardPage() {
         ))}
       </section>
 
-      <StockSearch onSelect={setSelectedStock} />
+      <section className="w-full min-w-0">
+        <StockSearch onSelect={setSelectedStock} />
+      </section>
 
-      <StockPriceCards symbol={selectedStock.symbol} />
+      <section className="w-full min-w-0">
+        <StockPriceCards symbol={selectedStock.symbol} />
+      </section>
 
-      <section>
-        <div className="min-h-90 rounded-lg border border-white/8 bg-[#111722] p-5">
-          <div>
+      <section className="w-full min-w-0">
+        <div className="min-h-70 w-full min-w-0 overflow-hidden rounded-lg border border-white/8 bg-[#111722] p-3 sm:min-h-90 sm:p-5">
+          <div className="min-w-0">
             <h2 className="text-sm font-semibold text-white">
               Stock performance
             </h2>
 
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 wrap-break-word text-xs text-slate-500">
               Historical price chart · {selectedStock.symbol}
             </p>
           </div>
 
-          <div className="mt-5">
+          <div className="mt-4 w-full min-w-0 sm:mt-5">
             <StockHistoryChart symbol={selectedStock.symbol} />
           </div>
         </div>

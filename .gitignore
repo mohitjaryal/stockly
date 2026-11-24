@@ -25,3 +25,5 @@ venv/
 # Local backup files
 frontend/page.backup.tsx
 frontend/page.root-backup.tsx
+.vercel
+.env*

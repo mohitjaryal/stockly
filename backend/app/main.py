@@ -12,6 +12,10 @@ from app.api.watchlist import router as watchlist_router
 from app.services.alert_monitor import check_active_alerts
 from app.api.mutual_funds import router as mutual_funds_router
 from app.api.portfolio import router as portfolio_router
+from app.api.portfolio_risk import router as portfolio_risk_router
+from app.api.investment_goals import router as investment_goals_router
+from app.api.investment_goal_contributions import router as investment_goal_contributions_router
+
 
 scheduler = BackgroundScheduler(timezone="UTC")
 
@@ -62,6 +66,9 @@ app.include_router(alerts_router)
 app.include_router(watchlist_router)
 app.include_router(mutual_funds_router)
 app.include_router(portfolio_router)
+app.include_router(investment_goals_router)
+app.include_router(portfolio_risk_router)
+app.include_router(investment_goal_contributions_router)
 
 
 @app.get("/")

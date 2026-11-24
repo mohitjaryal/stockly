@@ -207,12 +207,15 @@ export default function AlertPanel() {
 
   const selectedCurrency = getCurrency(selectedSymbol);
 
+  const inputClass =
+    "w-full min-w-0 rounded-lg border border-white/10 bg-[#0B1220] px-3 py-3 text-sm text-white outline-none focus:border-emerald-500";
+
   return (
-    <section className="rounded-xl border border-white/10 bg-[#111827] p-5">
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <div>
+    <section className="w-full min-w-0 rounded-xl border border-white/10 bg-[#111827] p-3 sm:p-5">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
           <h2 className="text-lg font-semibold text-white">Price Alerts</h2>
-          <p className="mt-1 text-sm text-gray-400">
+          <p className="mt-1 text-sm leading-5 text-gray-400">
             Set target prices for your favorite stocks.
           </p>
         </div>
@@ -220,7 +223,7 @@ export default function AlertPanel() {
         {typeof window !== "undefined" && "Notification" in window && (
           <button
             onClick={requestNotificationPermission}
-            className="rounded-lg border border-white/10 px-3 py-2 text-xs text-gray-300 transition hover:bg-white/5"
+            className="w-full rounded-lg border border-white/10 px-3 py-2.5 text-xs text-gray-300 transition hover:bg-white/5 sm:w-auto"
           >
             Enable Notifications
           </button>
@@ -233,7 +236,9 @@ export default function AlertPanel() {
             <span className="mr-2">🔔</span>
             Price alert triggered!
           </p>
-          <p className="mt-1 text-sm text-gray-300">{notification}</p>
+          <p className="mt-1 wrap-break-word text-sm text-gray-300">
+            {notification}
+          </p>
           <button
             onClick={() => setNotification("")}
             className="mt-2 text-xs text-gray-400 hover:text-white"
@@ -243,15 +248,17 @@ export default function AlertPanel() {
         </div>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div>
+      <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="min-w-0">
           <label className="mb-2 block text-sm text-gray-400">Stock</label>
           <select
             value={stockId}
             onChange={(e) => setStockId(e.target.value)}
-            className="w-full rounded-lg border border-white/10 bg-[#0B1220] px-3 py-2.5 text-sm text-white outline-none focus:border-emerald-500"
+            className={inputClass}
           >
-            {stocks.length === 0 && <option value="">No stocks available</option>}
+            {stocks.length === 0 && (
+              <option value="">No stocks available</option>
+            )}
             {stocks.map((stock) => (
               <option key={stock.id} value={stock.id}>
                 {stock.symbol} — {stock.company_name}
@@ -260,19 +267,19 @@ export default function AlertPanel() {
           </select>
         </div>
 
-        <div>
+        <div className="min-w-0">
           <label className="mb-2 block text-sm text-gray-400">Condition</label>
           <select
             value={condition}
             onChange={(e) => setCondition(e.target.value as "above" | "below")}
-            className="w-full rounded-lg border border-white/10 bg-[#0B1220] px-3 py-2.5 text-sm text-white outline-none focus:border-emerald-500"
+            className={inputClass}
           >
             <option value="above">Price goes above</option>
             <option value="below">Price goes below</option>
           </select>
         </div>
 
-        <div className="sm:col-span-2">
+        <div className="min-w-0 sm:col-span-2">
           <label className="mb-2 block text-sm text-gray-400">
             Target Price ({selectedCurrency})
           </label>
@@ -283,7 +290,7 @@ export default function AlertPanel() {
             value={targetPrice}
             onChange={(e) => setTargetPrice(e.target.value)}
             placeholder="Enter target price"
-            className="w-full rounded-lg border border-white/10 bg-[#0B1220] px-3 py-2.5 text-sm text-white outline-none placeholder:text-gray-600 focus:border-emerald-500"
+            className={inputClass}
           />
         </div>
       </div>
@@ -291,18 +298,24 @@ export default function AlertPanel() {
       <button
         onClick={handleCreateAlert}
         disabled={loading || stocks.length === 0}
-        className="mt-4 rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-medium text-black transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
+        className="mt-4 w-full rounded-lg bg-emerald-500 px-4 py-3 text-sm font-medium text-black transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
       >
         {loading ? "Creating..." : "Create Alert"}
       </button>
 
-      {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
-      {success && <p className="mt-3 text-sm text-emerald-400">{success}</p>}
+      {error && (
+        <p className="mt-3 wrap-break-word text-sm text-red-400">{error}</p>
+      )}
+      {success && (
+        <p className="mt-3 wrap-break-word text-sm text-emerald-400">{success}</p>
+      )}
 
       <div className="mt-6 border-t border-white/10 pt-5">
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex items-center justify-between gap-2">
           <h3 className="font-medium text-white">Your Alerts</h3>
-          <span className="text-xs text-gray-400">{alerts.length} total</span>
+          <span className="shrink-0 text-xs text-gray-400">
+            {alerts.length} total
+          </span>
         </div>
 
         {alerts.length === 0 ? (
@@ -317,14 +330,14 @@ export default function AlertPanel() {
               return (
                 <div
                   key={alert.id}
-                  className="rounded-lg border border-white/10 bg-[#0B1220] p-3"
+                  className="min-w-0 rounded-lg border border-white/10 bg-[#0B1220] p-3 sm:p-4"
                 >
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="font-medium text-white">
+                  <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="wrap-break-word font-medium text-white">
                         {getStockSymbol(alert.stock_id)}
                       </p>
-                      <p className="mt-1 text-sm text-gray-400">
+                      <p className="mt-1 wrap-break-word text-sm text-gray-400">
                         Price {alert.condition} {currency}
                         {Number(alert.target_price).toFixed(2)}
                       </p>
@@ -338,24 +351,25 @@ export default function AlertPanel() {
                         {alert.status}
                       </p>
                       {alert.triggered_at && (
-                        <p className="mt-1 text-xs text-gray-500">
-                          Triggered: {new Date(alert.triggered_at).toLocaleString()}
+                        <p className="mt-1 wrap-break-word text-xs text-gray-500">
+                          Triggered:{" "}
+                          {new Date(alert.triggered_at).toLocaleString()}
                         </p>
                       )}
                     </div>
 
-                    <div className="flex flex-wrap gap-2">
+                    <div className="grid w-full grid-cols-2 gap-2 sm:w-auto">
                       {alert.status === "active" && (
                         <button
                           onClick={() => startEditing(alert)}
-                          className="rounded-md border border-white/10 px-3 py-1.5 text-xs text-gray-300 transition hover:bg-white/5"
+                          className="rounded-md border border-white/10 px-3 py-2 text-xs text-gray-300 transition hover:bg-white/5"
                         >
                           Edit
                         </button>
                       )}
                       <button
                         onClick={() => handleDeleteAlert(alert.id)}
-                        className="rounded-md border border-red-500/20 px-3 py-1.5 text-xs text-red-400 transition hover:bg-red-500/10"
+                        className="rounded-md border border-red-500/20 px-3 py-2 text-xs text-red-400 transition hover:bg-red-500/10"
                       >
                         Delete
                       </button>
@@ -363,13 +377,13 @@ export default function AlertPanel() {
                   </div>
 
                   {editingId === alert.id && (
-                    <div className="mt-4 grid gap-3 border-t border-white/10 pt-4 sm:grid-cols-2">
+                    <div className="mt-4 grid min-w-0 grid-cols-1 gap-3 border-t border-white/10 pt-4 sm:grid-cols-2">
                       <select
                         value={editCondition}
                         onChange={(e) =>
                           setEditCondition(e.target.value as "above" | "below")
                         }
-                        className="rounded-lg border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white"
+                        className={inputClass}
                       >
                         <option value="above">Price goes above</option>
                         <option value="below">Price goes below</option>
@@ -381,20 +395,20 @@ export default function AlertPanel() {
                         step="0.01"
                         value={editPrice}
                         onChange={(e) => setEditPrice(e.target.value)}
-                        className="rounded-lg border border-white/10 bg-[#111827] px-3 py-2 text-sm text-white"
+                        className={inputClass}
                       />
 
-                      <div className="flex gap-2 sm:col-span-2">
+                      <div className="flex flex-col gap-2 sm:col-span-2 sm:flex-row">
                         <button
                           onClick={() => handleUpdateAlert(alert.id)}
                           disabled={savingEdit}
-                          className="rounded-lg bg-emerald-500 px-3 py-2 text-xs font-medium text-black disabled:opacity-50"
+                          className="w-full rounded-lg bg-emerald-500 px-3 py-3 text-xs font-medium text-black disabled:opacity-50 sm:w-auto"
                         >
                           {savingEdit ? "Saving..." : "Save Changes"}
                         </button>
                         <button
                           onClick={() => setEditingId(null)}
-                          className="rounded-lg border border-white/10 px-3 py-2 text-xs text-gray-300"
+                          className="w-full rounded-lg border border-white/10 px-3 py-3 text-xs text-gray-300 sm:w-auto"
                         >
                           Cancel
                         </button>

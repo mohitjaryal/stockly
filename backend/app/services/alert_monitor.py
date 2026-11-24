@@ -6,6 +6,7 @@ from decimal import Decimal, InvalidOperation
 from app.db.session import SessionLocal
 from app.models import Alert, Stock
 from app.services.market_data import get_stock_quote
+from app.algorithms.price_alert_heap import PriceAlertHeap
 
 logger = logging.getLogger(__name__)
 
@@ -21,65 +22,87 @@ def check_active_alerts():
             .all()
         )
 
-        quotes = {}
-        triggered_count = 0
+        # Group alerts by stock and condition
+        grouped_alerts = {}
 
         for alert in alerts:
             symbol = alert.stock.symbol
 
-            # Fetch only one quote per stock.
-            if symbol not in quotes:
-                try:
-                    quote = get_stock_quote(symbol)
+            if symbol not in grouped_alerts:
+                grouped_alerts[symbol] = {
+                    "above": [],
+                    "below": [],
+                }
 
-                    if not isinstance(quote, dict):
-                        raise ValueError("Invalid quote response")
+            if alert.condition in ("above", "below"):
+                grouped_alerts[symbol][alert.condition].append(alert)
+            else:
+                logger.warning(
+                    "Unknown alert condition for alert ID %s",
+                    alert.id,
+                )
 
-                    raw_price = quote.get("c")
+        triggered_count = 0
 
-                    if raw_price is None:
-                        raise ValueError("Quote does not contain current price")
+        for symbol, conditions in grouped_alerts.items():
 
-                    current_price = Decimal(str(raw_price))
+            # Fetch only one quote per stock
+            try:
+                quote = get_stock_quote(symbol)
 
-                    if not current_price.is_finite() or current_price <= 0:
-                        raise ValueError("Invalid or non-positive stock price")
+                if not isinstance(quote, dict):
+                    raise ValueError("Invalid quote response")
 
-                    quotes[symbol] = current_price
+                raw_price = quote.get("c")
 
-                except (InvalidOperation, ValueError) as exc:
-                    logger.warning(
-                        "Skipping alerts for %s: %s",
-                        symbol,
-                        exc,
-                    )
-                    quotes[symbol] = None
+                if raw_price is None:
+                    raise ValueError("Quote does not contain current price")
 
-                except Exception as exc:
-                    logger.warning(
-                        "Quote fetch failed for %s: %s",
-                        symbol,
-                        exc,
-                    )
-                    quotes[symbol] = None
+                current_price = Decimal(str(raw_price))
 
-            current_price = quotes[symbol]
+                if not current_price.is_finite() or current_price <= 0:
+                    raise ValueError("Invalid or non-positive stock price")
 
-            # Skip this stock if its quote could not be fetched.
-            if current_price is None:
+            except (InvalidOperation, ValueError) as exc:
+                logger.warning(
+                    "Skipping alerts for %s: %s",
+                    symbol,
+                    exc,
+                )
                 continue
 
-            target_price = Decimal(str(alert.target_price))
+            except Exception as exc:
+                logger.warning(
+                    "Quote fetch failed for %s: %s",
+                    symbol,
+                    exc,
+                )
+                continue
 
-            should_trigger = (
-                alert.condition == "above"
-                and current_price >= target_price
-            ) or (
-                alert.condition == "below"
-                and current_price <= target_price
-            )
+            # Build custom Min Heap and Max Heap
+            above_heap = PriceAlertHeap("above", conditions["above"])
+            below_heap = PriceAlertHeap("below", conditions["below"])
 
-            if should_trigger:
+            # Trigger eligible 'above' alerts
+            while (
+                not above_heap.is_empty()
+                and current_price >= Decimal(
+                    str(above_heap.peek().target_price)
+                )
+            ):
+                alert = above_heap.pop()
+                alert.status = "triggered"
+                alert.triggered_at = datetime.now(timezone.utc)
+                triggered_count += 1
+
+            # Trigger eligible 'below' alerts
+            while (
+                not below_heap.is_empty()
+                and current_price <= Decimal(
+                    str(below_heap.peek().target_price)
+                )
+            ):
+                alert = below_heap.pop()
                 alert.status = "triggered"
                 alert.triggered_at = datetime.now(timezone.utc)
                 triggered_count += 1

@@ -21,9 +21,8 @@ function formatAmount(value: number | string | null, symbol: string) {
 
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
-    currency: symbol.endsWith(".NS") || symbol.endsWith(".BO")
-      ? "INR"
-      : "USD",
+    currency:
+      symbol.endsWith(".NS") || symbol.endsWith(".BO") ? "INR" : "USD",
     maximumFractionDigits: 2,
   }).format(Number(value));
 }
@@ -33,6 +32,17 @@ function formatNumber(value: number | string) {
     maximumFractionDigits: 4,
   });
 }
+
+const allocationColors = [
+  "#34D399",
+  "#60A5FA",
+  "#A78BFA",
+  "#FBBF24",
+  "#F87171",
+  "#22D3EE",
+  "#F472B6",
+  "#A3E635",
+];
 
 export default function PortfolioPage() {
   const [summary, setSummary] = useState<PortfolioSummary | null>(null);
@@ -58,17 +68,13 @@ export default function PortfolioPage() {
     setError("");
 
     try {
-      const [
-        summaryData,
-        holdingsData,
-        transactionsData,
-        stocksData,
-      ] = await Promise.all([
-        getPortfolioSummary(),
-        getPortfolioHoldings(),
-        getPortfolioTransactions(),
-        getStocks(),
-      ]);
+      const [summaryData, holdingsData, transactionsData, stocksData] =
+        await Promise.all([
+          getPortfolioSummary(),
+          getPortfolioHoldings(),
+          getPortfolioTransactions(),
+          getStocks(),
+        ]);
 
       setSummary(summaryData);
       setHoldings(holdingsData);
@@ -90,6 +96,55 @@ export default function PortfolioPage() {
   const selectedStock = stocks.find(
     (stock) => stock.id === Number(stockId)
   );
+
+  // Calculate allocation separately for INR and USD holdings.
+  const allocationGroups = (["INR", "USD"] as const)
+    .map((currency) => {
+      const items = holdings.filter((holding) => {
+        const isINR =
+          holding.symbol.endsWith(".NS") ||
+          holding.symbol.endsWith(".BO");
+
+        return (
+          (currency === "INR" ? isINR : !isINR) &&
+          Number(holding.invested_value) > 0
+        );
+      });
+
+      const total = items.reduce(
+        (sum, holding) => sum + Number(holding.invested_value),
+        0
+      );
+
+      let cumulative = 0;
+
+      const segments = items.map((holding, index) => {
+        const amount = Number(holding.invested_value);
+        const percentage = total > 0 ? (amount / total) * 100 : 0;
+
+        const segment = {
+          holding,
+          amount,
+          percentage,
+          color: allocationColors[index % allocationColors.length],
+          start: cumulative,
+          end: cumulative + percentage,
+        };
+
+        cumulative += percentage;
+        return segment;
+      });
+
+      const gradient = segments
+        .map(
+          (segment) =>
+            `${segment.color} ${segment.start}% ${segment.end}%`
+        )
+        .join(", ");
+
+      return { currency, items, total, segments, gradient };
+    })
+    .filter((group) => group.items.length > 0);
 
   const resetForm = () => {
     setStockId("");
@@ -140,31 +195,23 @@ export default function PortfolioPage() {
   const stats = [
     {
       label: "Total Invested",
-      value: summary
-        ? formatNumber(summary.total_invested)
-        : "—",
+      value: summary ? formatNumber(summary.total_invested) : "—",
       detail: "Remaining cost basis",
     },
     {
       label: "Current Value",
-      value: summary
-        ? formatNumber(summary.current_value)
-        : "—",
+      value: summary ? formatNumber(summary.current_value) : "—",
       detail: "Latest available prices",
     },
     {
       label: "Unrealized P&L",
-      value: summary
-        ? formatNumber(summary.unrealized_profit_loss)
-        : "—",
+      value: summary ? formatNumber(summary.unrealized_profit_loss) : "—",
       detail: "Open positions",
       profit: Number(summary?.unrealized_profit_loss ?? 0) >= 0,
     },
     {
       label: "Total P&L",
-      value: summary
-        ? formatNumber(summary.total_profit_loss)
-        : "—",
+      value: summary ? formatNumber(summary.total_profit_loss) : "—",
       detail: "Realized + unrealized",
       profit: Number(summary?.total_profit_loss ?? 0) >= 0,
     },
@@ -172,6 +219,7 @@ export default function PortfolioPage() {
 
   return (
     <div className="space-y-8">
+      {/* Page heading */}
       <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
           <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
@@ -198,18 +246,17 @@ export default function PortfolioPage() {
         </button>
       </section>
 
+      {/* Error message */}
       {error && (
         <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-400">
           {error}
-          <button
-            onClick={loadPortfolio}
-            className="ml-3 underline"
-          >
+          <button onClick={loadPortfolio} className="ml-3 underline">
             Retry
           </button>
         </div>
       )}
 
+      {/* Summary cards */}
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map((stat) => (
           <div
@@ -235,20 +282,15 @@ export default function PortfolioPage() {
         ))}
       </section>
 
+      {/* Portfolio counts */}
       <section className="grid gap-4 sm:grid-cols-3">
         {[
-          {
-            label: "Total Holdings",
-            value: summary?.holdings_count ?? 0,
-          },
+          { label: "Total Holdings", value: summary?.holdings_count ?? 0 },
           {
             label: "Priced Holdings",
             value: summary?.priced_holdings_count ?? 0,
           },
-          {
-            label: "Transactions",
-            value: transactions.length,
-          },
+          { label: "Transactions", value: transactions.length },
         ].map((item) => (
           <div
             key={item.label}
@@ -262,6 +304,106 @@ export default function PortfolioPage() {
         ))}
       </section>
 
+      {/* Portfolio allocation chart */}
+      <section className="rounded-lg border border-white/8 bg-[#111722] p-5">
+        <div className="mb-6">
+          <h2 className="text-sm font-semibold text-white">
+            Portfolio Allocation
+          </h2>
+          <p className="mt-1 text-xs text-slate-500">
+            Investment distribution across your stocks
+          </p>
+        </div>
+
+        {loading ? (
+          <p className="py-10 text-center text-sm text-slate-500">
+            Loading allocation...
+          </p>
+        ) : allocationGroups.length === 0 ? (
+          <div className="py-10 text-center">
+            <p className="text-sm text-slate-300">
+              No allocation data available
+            </p>
+            <p className="mt-2 text-xs text-slate-500">
+              Add a BUY transaction to see your portfolio allocation.
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-8 lg:grid-cols-2">
+            {allocationGroups.map((group) => (
+              <div key={group.currency}>
+                <div className="mb-5 flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-white">
+                    {group.currency === "INR"
+                      ? "Indian Investments"
+                      : "International Investments"}
+                  </h3>
+                  <span className="text-xs text-slate-400">
+                    {group.currency}
+                  </span>
+                </div>
+
+                <div className="flex flex-col items-center gap-7 sm:flex-row">
+                  <div className="relative h-48 w-48 shrink-0">
+                    <div
+                      className="h-full w-full rounded-full"
+                      style={{
+                        background: `conic-gradient(${group.gradient})`,
+                      }}
+                    />
+                    <div className="absolute inset-7 flex flex-col items-center justify-center rounded-full bg-[#111722]">
+                      <span className="text-xs text-slate-500">
+                        Total invested
+                      </span>
+                      <span className="mt-1 text-lg font-semibold text-white">
+                        {new Intl.NumberFormat("en-IN", {
+                          style: "currency",
+                          currency: group.currency,
+                          maximumFractionDigits: 0,
+                        }).format(group.total)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="w-full min-w-0 space-y-4">
+                    {group.segments.map((segment) => (
+                      <div key={segment.holding.stock_id}>
+                        <div className="mb-1 flex items-center justify-between gap-3">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <span
+                              className="h-2.5 w-2.5 shrink-0 rounded-full"
+                              style={{ backgroundColor: segment.color }}
+                            />
+                            <span className="truncate text-sm font-medium text-white">
+                              {segment.holding.symbol}
+                            </span>
+                          </div>
+
+                          <span className="shrink-0 text-xs text-slate-400">
+                            {segment.percentage.toFixed(1)}%
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between text-xs text-slate-500">
+                          <span>
+                            {new Intl.NumberFormat("en-IN", {
+                              style: "currency",
+                              currency: group.currency,
+                              maximumFractionDigits: 2,
+                            }).format(segment.amount)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Holdings table */}
       <section className="overflow-hidden rounded-lg border border-white/8 bg-[#111722]">
         <div className="flex items-center justify-between border-b border-white/8 px-5 py-5">
           <div>
@@ -287,9 +429,7 @@ export default function PortfolioPage() {
           </div>
         ) : holdings.length === 0 ? (
           <div className="p-10 text-center">
-            <p className="text-sm text-slate-300">
-              No holdings yet
-            </p>
+            <p className="text-sm text-slate-300">No holdings yet</p>
             <p className="mt-2 text-xs text-slate-500">
               Add your first BUY transaction to get started.
             </p>
@@ -329,7 +469,10 @@ export default function PortfolioPage() {
                     </td>
 
                     <td className="px-5 py-4 text-slate-300">
-                      {formatAmount(holding.average_buy_price, holding.symbol)}
+                      {formatAmount(
+                        holding.average_buy_price,
+                        holding.symbol
+                      )}
                     </td>
 
                     <td className="px-5 py-4 text-slate-300">
@@ -344,11 +487,13 @@ export default function PortfolioPage() {
                       {formatAmount(holding.current_value, holding.symbol)}
                     </td>
 
-                    <td className={`px-5 py-4 font-medium ${
-                      Number(holding.unrealized_profit_loss ?? 0) >= 0
-                        ? "text-emerald-400"
-                        : "text-red-400"
-                    }`}>
+                    <td
+                      className={`px-5 py-4 font-medium ${
+                        Number(holding.unrealized_profit_loss ?? 0) >= 0
+                          ? "text-emerald-400"
+                          : "text-red-400"
+                      }`}
+                    >
                       {formatAmount(
                         holding.unrealized_profit_loss,
                         holding.symbol
@@ -362,6 +507,7 @@ export default function PortfolioPage() {
         )}
       </section>
 
+      {/* Recent transactions */}
       <section className="overflow-hidden rounded-lg border border-white/8 bg-[#111722]">
         <div className="border-b border-white/8 px-5 py-5">
           <h2 className="text-sm font-semibold text-white">
@@ -406,7 +552,9 @@ export default function PortfolioPage() {
                       </span>
                     </p>
                     <p className="mt-1 text-xs text-slate-500">
-                      {new Date(transaction.transaction_date).toLocaleString()}
+                      {new Date(
+                        transaction.transaction_date
+                      ).toLocaleString()}
                     </p>
                   </div>
                 </div>
@@ -414,7 +562,10 @@ export default function PortfolioPage() {
                 <div className="text-left sm:text-right">
                   <p className="text-sm font-medium text-white">
                     {formatNumber(transaction.quantity)} ×{" "}
-                    {formatAmount(transaction.price, transaction.stock.symbol)}
+                    {formatAmount(
+                      transaction.price,
+                      transaction.stock.symbol
+                    )}
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
                     {transaction.notes || "No notes"}
@@ -426,6 +577,7 @@ export default function PortfolioPage() {
         )}
       </section>
 
+      {/* Add transaction modal */}
       {showForm && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
@@ -505,8 +657,9 @@ export default function PortfolioPage() {
                 <p className="text-xs text-slate-500">
                   Available quantity:{" "}
                   {formatNumber(
-                    holdings.find((item) => item.stock_id === selectedStock.id)
-                      ?.quantity ?? 0
+                    holdings.find(
+                      (item) => item.stock_id === selectedStock.id
+                    )?.quantity ?? 0
                   )}
                 </p>
               )}
@@ -598,7 +751,8 @@ export default function PortfolioPage() {
 
       <p className="text-xs text-slate-600">
         Portfolio summary amounts currently use native currency values. USD
-        and INR holdings are not yet converted into one common currency.
+        and INR holdings are displayed separately and are not converted into
+        one common currency.
       </p>
     </div>
   );

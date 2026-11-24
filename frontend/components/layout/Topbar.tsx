@@ -11,7 +11,11 @@ import {
   type StockSearchResult,
 } from "@/features/stocks/services/stockService";
 
-export default function Topbar() {
+interface TopbarProps {
+  onMenuClick: () => void;
+}
+
+export default function Topbar({ onMenuClick }: TopbarProps) {
   const router = useRouter();
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -28,6 +32,13 @@ export default function Topbar() {
     router.replace("/login");
   }
 
+  function closeSearch() {
+    setIsOpen(false);
+    setQuery("");
+    setResults([]);
+    setError("");
+  }
+
   useEffect(() => {
     function handleShortcut(event: KeyboardEvent) {
       if (
@@ -40,9 +51,7 @@ export default function Topbar() {
       }
 
       if (event.key === "Escape") {
-        setIsOpen(false);
-        setQuery("");
-        setResults([]);
+        closeSearch();
       }
     }
 
@@ -108,8 +117,8 @@ export default function Topbar() {
           const newStock = await addStock(result);
           setSavedStocks((previous) => [...previous, newStock]);
         } catch (addError) {
-          // Handle a stock that may already have been saved elsewhere.
           const latestStocks = await getStocks();
+
           const existing = latestStocks.find(
             (stock) => stock.symbol.toUpperCase() === symbol
           );
@@ -122,10 +131,7 @@ export default function Topbar() {
         }
       }
 
-      setIsOpen(false);
-      setQuery("");
-      setResults([]);
-
+      closeSearch();
       router.push(`/?symbol=${encodeURIComponent(symbol)}`);
     } catch (err) {
       setError(
@@ -143,136 +149,165 @@ export default function Topbar() {
       const data = await getStocks();
       setSavedStocks(data);
     } catch {
-      // Search can still work even if saved stocks cannot be loaded.
+      // Search can still work if saved stocks cannot be loaded.
     }
 
     setTimeout(() => searchRef.current?.focus(), 0);
   }
 
   return (
-    <header className="sticky top-0 z-20 flex h-18 items-center justify-between border-b border-white/8 bg-[#0B0F17]/95 px-8 backdrop-blur">
-      <div>
-        <p className="text-sm font-medium text-white">Market Overview</p>
-        <p className="mt-0.5 text-[11px] text-slate-500">
-          Your market at a glance
-        </p>
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-white/8 bg-[#0B0F17]/95 px-3 backdrop-blur sm:h-18 sm:px-6 lg:px-8">
+
+      {/* Left section */}
+      <div className="flex min-w-0 items-center gap-3">
+        <button
+          type="button"
+          onClick={onMenuClick}
+          aria-label="Open navigation menu"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 text-lg text-slate-300 transition hover:bg-white/5 lg:hidden"
+        >
+          ☰
+        </button>
+
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium text-white">
+            Market Overview
+          </p>
+          <p className="mt-0.5 hidden text-[11px] text-slate-500 sm:block">
+            Your market at a glance
+          </p>
+        </div>
       </div>
 
-      <div className="flex items-center gap-5">
-        <div className="relative hidden sm:block">
+      {/* Right section */}
+      <div className="flex shrink-0 items-center gap-2 sm:gap-4">
+
+        {/* Search */}
+        <div className="relative">
           <button
             type="button"
             onClick={openSearch}
-            className="flex items-center gap-2 rounded-md border border-white/9 px-3 py-2 transition hover:border-emerald-400/40 hover:bg-white/[0.03]"
+            aria-label="Search stocks"
+            className="flex h-9 items-center justify-center gap-2 rounded-lg border border-white/10 px-3 text-slate-300 transition hover:border-emerald-400/40 hover:bg-white/3 sm:px-4"
           >
-            <span className="text-slate-500">⌕</span>
-            <span className="text-xs text-slate-400">
+            <span className="text-lg">⌕</span>
+            <span className="hidden text-xs text-slate-400 sm:inline">
               Search stocks...
             </span>
-            <span className="ml-8 rounded border border-white/10 px-1.5 py-0.5 text-[10px] text-slate-500">
+            <span className="hidden rounded border border-white/10 px-1.5 py-0.5 text-[10px] text-slate-500 lg:inline">
               ⌘ K
             </span>
           </button>
 
+          {/* Search dropdown */}
           {isOpen && (
-            <div className="absolute right-0 top-full z-50 mt-3 w-[380px] overflow-hidden rounded-lg border border-white/10 bg-[#111722] shadow-2xl">
-              <div className="border-b border-white/[0.08] p-3">
-                <input
-                  ref={searchRef}
-                  type="text"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search company or symbol..."
-                  className="w-full rounded-md border border-white/10 bg-[#151d2a] px-3 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-emerald-400/50"
-                />
-                <p className="mt-2 text-[10px] text-slate-500">
-                  Search US and Indian stocks
-                </p>
-              </div>
+            <>
+              <button
+                type="button"
+                aria-label="Close search"
+                onClick={closeSearch}
+                className="fixed inset-0 z-40 cursor-default bg-black/30"
+              />
 
-              <div className="max-h-80 overflow-y-auto">
-                {loading && (
-                  <p className="p-4 text-xs text-slate-400">
-                    Searching stocks...
+              <div className="fixed left-3 right-3 top-20 z-50 overflow-hidden rounded-xl border border-white/10 bg-[#111722] shadow-2xl sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-3 sm:w-95">
+                <div className="border-b border-white/8 p-3">
+                  <input
+                    ref={searchRef}
+                    type="text"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Search company or symbol..."
+                    className="w-full rounded-lg border border-white/10 bg-[#151d2a] px-3 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-emerald-400/50"
+                  />
+
+                  <p className="mt-2 text-[10px] text-slate-500">
+                    Search US and Indian stocks
                   </p>
-                )}
+                </div>
 
-                {error && (
-                  <p className="p-4 text-xs text-red-400">{error}</p>
-                )}
-
-                {!loading &&
-                  !error &&
-                  query.trim() &&
-                  results.length === 0 && (
+                <div className="max-h-[60vh] overflow-y-auto">
+                  {loading && (
                     <p className="p-4 text-xs text-slate-400">
-                      No matching stocks found.
+                      Searching stocks...
                     </p>
                   )}
 
-                {results.map((result) => {
-                  const saved = savedStocks.some(
-                    (stock) =>
-                      stock.symbol.toUpperCase() ===
-                      result.symbol.toUpperCase()
-                  );
+                  {error && (
+                    <p className="p-4 text-xs text-red-400">{error}</p>
+                  )}
 
-                  return (
-                    <button
-                      key={result.symbol}
-                      type="button"
-                      disabled={!!addingSymbol}
-                      onClick={() => openStock(result)}
-                      className="flex w-full items-center justify-between gap-3 border-b border-white/[0.05] px-4 py-3 text-left transition hover:bg-white/[0.05] disabled:opacity-50"
-                    >
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-white">
-                          {result.symbol}
-                        </p>
-                        <p className="mt-1 truncate text-xs text-slate-400">
-                          {result.description}
-                        </p>
-                      </div>
+                  {!loading &&
+                    !error &&
+                    query.trim() &&
+                    results.length === 0 && (
+                      <p className="p-4 text-xs text-slate-400">
+                        No matching stocks found.
+                      </p>
+                    )}
 
-                      <span className="shrink-0 text-[10px] font-medium text-emerald-400">
-                        {addingSymbol === result.symbol.toUpperCase()
-                          ? "Adding..."
-                          : saved
-                            ? "Open"
-                            : "Add & open"}
-                      </span>
-                    </button>
-                  );
-                })}
+                  {results.map((result) => {
+                    const saved = savedStocks.some(
+                      (stock) =>
+                        stock.symbol.toUpperCase() ===
+                        result.symbol.toUpperCase()
+                    );
+
+                    return (
+                      <button
+                        key={result.symbol}
+                        type="button"
+                        disabled={!!addingSymbol}
+                        onClick={() => openStock(result)}
+                        className="flex w-full items-center justify-between gap-3 border-b border-white/5 px-4 py-3 text-left transition hover:bg-white/5 disabled:opacity-50"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-white">
+                            {result.symbol}
+                          </p>
+                          <p className="mt-1 truncate text-xs text-slate-400">
+                            {result.description}
+                          </p>
+                        </div>
+
+                        <span className="shrink-0 text-[10px] font-medium text-emerald-400">
+                          {addingSymbol === result.symbol.toUpperCase()
+                            ? "Adding..."
+                            : saved
+                              ? "Open"
+                              : "Add & open"}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="flex justify-between border-t border-white/8 px-4 py-3">
+                  <span className="text-[10px] text-slate-500">
+                    Press ESC to close
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={closeSearch}
+                    className="text-[10px] text-slate-400 hover:text-white"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
-
-              <div className="flex justify-between border-t border-white/[0.08] px-4 py-3">
-                <span className="text-[10px] text-slate-500">
-                  Press ESC to close
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsOpen(false);
-                    setQuery("");
-                    setResults([]);
-                  }}
-                  className="text-[10px] text-slate-400 hover:text-white"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
+            </>
           )}
         </div>
 
+        {/* Profile */}
         <div className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-xs font-medium text-slate-300">
           M
         </div>
 
+        {/* Logout */}
         <button
           onClick={handleLogout}
-          className="rounded-md border border-white/10 px-3 py-2 text-xs font-medium text-slate-300 transition hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-400"
+          className="rounded-lg border border-white/10 px-2.5 py-2 text-[11px] font-medium text-slate-300 transition hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-400 sm:px-3 sm:text-xs"
         >
           Logout
         </button>
