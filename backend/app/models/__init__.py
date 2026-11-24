@@ -6,6 +6,8 @@ from app.models.alert import Alert
 from app.models.historical_candle import HistoricalCandle
 from app.models.watchlist import Watchlist
 from app.models.portfolio_transaction import PortfolioTransaction
+from app.models.investment_goal import InvestmentGoal
+from app.models.investment_goal_contribution import InvestmentGoalContribution
 
 __all__ = [
     "User",
@@ -16,4 +18,6 @@ __all__ = [
     "HistoricalCandle",
     "Watchlist",
     "PortfolioTransaction",
+    "InvestmentGoal",
+    "InvestmentGoalContribution",
 ]
