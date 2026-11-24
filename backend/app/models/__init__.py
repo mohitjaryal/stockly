@@ -8,6 +8,9 @@ from app.models.watchlist import Watchlist
 from app.models.portfolio_transaction import PortfolioTransaction
 from app.models.investment_goal import InvestmentGoal
 from app.models.investment_goal_contribution import InvestmentGoalContribution
+from app.models.investment_budget import InvestmentBudget
+from app.models.investment_plan import InvestmentPlan
+
 
 __all__ = [
     "User",
@@ -20,4 +23,6 @@ __all__ = [
     "PortfolioTransaction",
     "InvestmentGoal",
     "InvestmentGoalContribution",
+    "InvestmentBudget",
+    "InvestmentPlan",
 ]
