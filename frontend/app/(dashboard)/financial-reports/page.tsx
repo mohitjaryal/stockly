@@ -15,12 +15,17 @@ function getCurrency(symbol: string): Currency {
   return symbol.endsWith(".NS") || symbol.endsWith(".BO") ? "INR" : "USD";
 }
 
+function safeNumber(value: unknown): number {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
+}
+
 function money(value: number, currency: Currency) {
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency,
     maximumFractionDigits: 2,
-  }).format(value);
+  }).format(safeNumber(value));
 }
 
 function downloadCSV(filename: string, rows: (string | number)[][]) {
@@ -54,13 +59,13 @@ export default function FinancialReportsPage() {
   useEffect(() => {
     Promise.all([getPortfolioHoldings(), getPortfolioTransactions()])
       .then(([holdingData, transactionData]) => {
-  setHoldings(holdingData);
-  setTransactions(transactionData);
+        setHoldings(holdingData);
+        setTransactions(transactionData);
 
-  if (holdingData.length > 0) {
-    setCurrency(getCurrency(holdingData[0].symbol));
-  }
-})
+        if (holdingData.length > 0) {
+          setCurrency(getCurrency(holdingData[0].symbol));
+        }
+      })
       .catch((err) => setError(err.message || "Unable to load reports"))
       .finally(() => setLoading(false));
   }, []);
@@ -80,27 +85,30 @@ export default function FinancialReportsPage() {
 
   const stats = useMemo(() => {
     const invested = filteredHoldings.reduce(
-      (sum, item) => sum + item.invested_value,
+      (sum, item) =>
+        sum +
+        safeNumber(item.quantity) * safeNumber(item.average_buy_price),
       0
     );
 
-    const current = filteredHoldings.reduce(
-      (sum, item) => sum + (item.current_value ?? 0),
-      0
-    );
+    const current = filteredHoldings.reduce((sum, item) => {
+      const currentValue =
+        item.current_value != null
+          ? safeNumber(item.current_value)
+          : safeNumber(item.quantity) * safeNumber(item.current_price);
 
-    const unrealized = filteredHoldings.reduce(
-      (sum, item) => sum + (item.unrealized_profit_loss ?? 0),
-      0
-    );
+      return sum + currentValue;
+    }, 0);
+
+    const unrealized = current - invested;
 
     const realized = filteredHoldings.reduce(
-      (sum, item) => sum + item.realized_profit_loss,
+      (sum, item) => sum + safeNumber(item.realized_profit_loss),
       0
     );
 
     const pricedCount = filteredHoldings.filter(
-      (item) => item.current_value !== null
+      (item) => item.current_value != null || item.current_price != null
     ).length;
 
     return {
@@ -122,6 +130,9 @@ export default function FinancialReportsPage() {
 
     filteredTransactions.forEach((transaction) => {
       const date = new Date(transaction.transaction_date);
+
+      if (Number.isNaN(date.getTime())) return;
+
       const key = `${date.getFullYear()}-${String(
         date.getMonth() + 1
       ).padStart(2, "0")}`;
@@ -130,7 +141,8 @@ export default function FinancialReportsPage() {
         months[key] = { buys: 0, sells: 0, buyCount: 0, sellCount: 0 };
       }
 
-      const value = transaction.quantity * transaction.price;
+      const value =
+        safeNumber(transaction.quantity) * safeNumber(transaction.price);
 
       if (transaction.transaction_type === "BUY") {
         months[key].buys += value;
@@ -169,8 +181,8 @@ export default function FinancialReportsPage() {
       ...filteredHoldings.map((item) => [
         item.symbol,
         item.company_name,
-        item.quantity,
-        item.average_buy_price,
+        safeNumber(item.quantity),
+        safeNumber(item.average_buy_price),
         item.current_price ?? "",
         item.invested_value,
         item.current_value ?? "",
@@ -199,9 +211,9 @@ export default function FinancialReportsPage() {
         item.stock.symbol,
         item.stock.company_name,
         item.transaction_type,
-        item.quantity,
-        item.price,
-        item.quantity * item.price,
+        safeNumber(item.quantity),
+        safeNumber(item.price),
+        safeNumber(item.quantity) * safeNumber(item.price),
         currency,
         item.notes ?? "",
       ]),
@@ -222,9 +234,11 @@ export default function FinancialReportsPage() {
           <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1.5 text-xs font-semibold tracking-wider text-cyan-300">
             FINANCIAL INTELLIGENCE
           </span>
+
           <h1 className="mt-5 text-3xl font-bold tracking-tight text-white sm:text-4xl">
             Financial Reports
           </h1>
+
           <p className="mt-3 max-w-xl text-sm leading-6 text-slate-400">
             Track your investment performance, review transaction history
             and understand how your portfolio is growing.
@@ -272,6 +286,7 @@ export default function FinancialReportsPage() {
                   Your {currency} portfolio snapshot
                 </p>
               </div>
+
               <span className="rounded-full bg-white/5 px-3 py-1.5 text-xs text-slate-400">
                 {stats.holdingsCount} holdings
               </span>
@@ -311,7 +326,9 @@ export default function FinancialReportsPage() {
                   className="rounded-2xl border border-white/10 bg-[#111827] p-5"
                 >
                   <p className="text-sm text-slate-400">{card.label}</p>
-                  <p className={`mt-3 break-words text-xl font-bold ${card.color}`}>
+                  <p
+                    className={`mt-3 break-words text-xl font-bold ${card.color}`}
+                  >
                     {card.value}
                   </p>
                 </div>
@@ -330,6 +347,7 @@ export default function FinancialReportsPage() {
                     Based on recorded BUY and SELL transactions
                   </p>
                 </div>
+
                 <span className="text-xs text-slate-500">
                   {monthlyActivity.length} months
                 </span>
@@ -354,7 +372,9 @@ export default function FinancialReportsPage() {
 
                       <div className="space-y-2">
                         <div className="flex items-center gap-3">
-                          <span className="w-10 text-xs text-slate-500">BUY</span>
+                          <span className="w-10 text-xs text-slate-500">
+                            BUY
+                          </span>
                           <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/5">
                             <div
                               className="h-full rounded-full bg-emerald-400"
@@ -367,8 +387,11 @@ export default function FinancialReportsPage() {
                             {money(item.buys, currency)}
                           </span>
                         </div>
+
                         <div className="flex items-center gap-3">
-                          <span className="w-10 text-xs text-slate-500">SELL</span>
+                          <span className="w-10 text-xs text-slate-500">
+                            SELL
+                          </span>
                           <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/5">
                             <div
                               className="h-full rounded-full bg-amber-400"
@@ -400,9 +423,7 @@ export default function FinancialReportsPage() {
             </div>
 
             <div className="rounded-3xl border border-white/10 bg-[#111827] p-6">
-              <h2 className="text-lg font-bold text-white">
-                Profit & Loss
-              </h2>
+              <h2 className="text-lg font-bold text-white">Profit & Loss</h2>
               <p className="mt-1 text-xs text-slate-500">
                 Realized plus unrealized P/L
               </p>
@@ -429,6 +450,7 @@ export default function FinancialReportsPage() {
                       {stats.pricedCount}/{stats.holdingsCount}
                     </span>
                   </div>
+
                   <div className="h-2 overflow-hidden rounded-full bg-white/10">
                     <div
                       className="h-full rounded-full bg-cyan-400"
@@ -456,13 +478,12 @@ export default function FinancialReportsPage() {
           <section className="overflow-hidden rounded-3xl border border-white/10 bg-[#111827]">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 p-5 sm:p-6">
               <div>
-                <h2 className="text-lg font-bold text-white">
-                  Holdings Report
-                </h2>
+                <h2 className="text-lg font-bold text-white">Holdings Report</h2>
                 <p className="mt-1 text-xs text-slate-500">
                   Detailed stock-wise portfolio breakdown
                 </p>
               </div>
+
               <button
                 onClick={exportHoldings}
                 disabled={filteredHoldings.length === 0}
@@ -488,39 +509,39 @@ export default function FinancialReportsPage() {
                       <th className="px-5 py-4">Unrealized P/L</th>
                     </tr>
                   </thead>
+
                   <tbody>
                     {filteredHoldings.map((item) => (
-                      <tr
-                        key={item.stock_id}
-                        className="border-t border-white/5"
-                      >
+                      <tr key={item.stock_id} className="border-t border-white/5">
                         <td className="px-5 py-4">
-                          <p className="font-semibold text-white">
-                            {item.symbol}
-                          </p>
+                          <p className="font-semibold text-white">{item.symbol}</p>
                           <p className="mt-1 text-xs text-slate-500">
                             {item.company_name}
                           </p>
                         </td>
+
                         <td className="px-5 py-4 text-slate-300">
                           {item.quantity}
                         </td>
+
                         <td className="px-5 py-4 text-slate-300">
                           {money(item.average_buy_price, currency)}
                         </td>
+
                         <td className="px-5 py-4 text-slate-300">
-                          {item.current_value === null
+                          {item.current_value == null
                             ? "—"
                             : money(item.current_value, currency)}
                         </td>
+
                         <td
                           className={`px-5 py-4 font-semibold ${
-                            (item.unrealized_profit_loss ?? 0) >= 0
+                            safeNumber(item.unrealized_profit_loss) >= 0
                               ? "text-emerald-400"
                               : "text-red-400"
                           }`}
                         >
-                          {item.unrealized_profit_loss === null
+                          {item.unrealized_profit_loss == null
                             ? "—"
                             : money(item.unrealized_profit_loss, currency)}
                         </td>
@@ -542,6 +563,7 @@ export default function FinancialReportsPage() {
                   Your recorded investment activity
                 </p>
               </div>
+
               <button
                 onClick={exportTransactions}
                 disabled={filteredTransactions.length === 0}
@@ -567,6 +589,7 @@ export default function FinancialReportsPage() {
                       <th className="px-5 py-4">Total Amount</th>
                     </tr>
                   </thead>
+
                   <tbody>
                     {[...filteredTransactions]
                       .sort(
@@ -575,18 +598,17 @@ export default function FinancialReportsPage() {
                           new Date(a.transaction_date).getTime()
                       )
                       .map((item) => (
-                        <tr
-                          key={item.id}
-                          className="border-t border-white/5"
-                        >
+                        <tr key={item.id} className="border-t border-white/5">
                           <td className="whitespace-nowrap px-5 py-4 text-slate-400">
                             {new Date(item.transaction_date).toLocaleDateString(
                               "en-IN"
                             )}
                           </td>
+
                           <td className="px-5 py-4 font-semibold text-white">
                             {item.stock.symbol}
                           </td>
+
                           <td className="px-5 py-4">
                             <span
                               className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
@@ -598,11 +620,16 @@ export default function FinancialReportsPage() {
                               {item.transaction_type}
                             </span>
                           </td>
+
                           <td className="px-5 py-4 text-slate-300">
                             {item.quantity}
                           </td>
+
                           <td className="px-5 py-4 font-medium text-white">
-                            {money(item.quantity * item.price, currency)}
+                            {money(
+                              safeNumber(item.quantity) * safeNumber(item.price),
+                              currency
+                            )}
                           </td>
                         </tr>
                       ))}
